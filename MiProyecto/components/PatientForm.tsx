@@ -23,15 +23,6 @@ export default function PatientForm({ onAddPatient }: Props) {
         setUrgencia(3);
     };
     
-
-    /* Se debe correr
-    npm install react-native
-    npm install uuid
-    npm install --save-dev @types/uuid
-    expo install uuid
-
-    Para limpiar los errores del return
-    */
 return (
     <View style={styles.container}>
       <TextInput placeholder="Nombre completo" value={nombre} onChangeText={setNombre} style={styles.input} />
