@@ -7,14 +7,14 @@ interface Props {
 }
 
 export default function PatientList({ patients }: Props) {
-  // Ordenar por urgencia (1 = más urgente)
+
   const sortedPatients = [...patients].sort((a, b) => a.urgencia - b.urgencia);
 
   return (
     <FlatList<Patient>
       data={sortedPatients}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
+      renderItem={({ item }: {item: Patient}) => (
         <View style={styles.card}>
           <Text style={styles.name}>{item.nombre}</Text>
           <Text>Expediente: {item.expediente}</Text>
