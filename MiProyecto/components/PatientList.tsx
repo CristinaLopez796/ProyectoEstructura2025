@@ -6,27 +6,74 @@ interface Props {
   patients: Patient[];
 }
 
-export default function PatientList({ patients }: Props) {
+function prioridadLabel(p: 1 | 2 | 3) {
+  if (p === 1) return "Alta";
+  if (p === 2) return "Media";
+  return "Baja";
+}
 
-  const sortedPatients = [...patients].sort((a, b) => a.urgencia - b.urgencia);
+function prioridadColor(p: 1 | 2 | 3) {
+  if (p === 1) return "#0E7490"; // turquesa oscuro
+  if (p === 2) return "#A78BFA"; // lavanda
+  return "#86EFAC";             // menta
+}
+
+export default function PatientList({ patients }: Props) {
+  // Orden por prioridad (1->3) y, opcionalmente, podríamos luego desempatar por fecha.
+  const sorted = [...patients].sort((a, b) => a.urgencia - b.urgencia);
 
   return (
-    <FlatList<Patient>
-      data={sortedPatients}
+    <FlatList
+      data={sorted}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }: {item: Patient}) => (
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <Text style={{ color: "#666" }}>No hay pacientes en espera.</Text>
+        </View>
+      }
+      renderItem={({ item }) => (
         <View style={styles.card}>
-          <Text style={styles.name}>{item.nombre}</Text>
-          <Text>Expediente: {item.expediente}</Text>
-          <Text>Urgencia: {item.urgencia}</Text>
-          <Text>Síntomas: {item.sintomas}</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.name}>{item.nombre}</Text>
+            <View style={[styles.badge, { backgroundColor: prioridadColor(item.urgencia) }]}>
+              <Text style={styles.badgeText}>{prioridadLabel(item.urgencia)}</Text>
+            </View>
+          </View>
+          <Text style={styles.meta}>Expediente: {item.expediente}</Text>
+          {!!item.fechaNacimiento && (
+            <Text style={styles.meta}>Nacimiento: {item.fechaNacimiento}</Text>
+          )}
+          <Text style={{ marginTop: 6 }}>Síntomas: {item.sintomas}</Text>
         </View>
       )}
+      contentContainerStyle={{ paddingBottom: 40 }}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 10, margin: 5, borderWidth: 1, borderRadius: 5 },
-  name: { fontWeight: "bold", fontSize: 16 },
+  empty: { padding: 20, alignItems: "center" },
+  card: {
+    padding: 14,
+    marginHorizontal: 6,
+    marginVertical: 6,
+    backgroundColor: "white",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#eee",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  name: { fontWeight: "600", fontSize: 16 },
+  meta: { color: "#555", marginTop: 2 },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  badgeText: { color: "#0a0a0a", fontWeight: "600" },
 });
