@@ -1,5 +1,9 @@
+// para que uuid funcione
+import 'react-native-get-random-values';
+
 import React, { useState } from "react";
 import { View, TextInput, Button, StyleSheet, Alert } from "react-native";
+import { useNavigation, CommonActions } from "@react-navigation/native"; // CommonActions
 import { Patient } from "../models/Patient";
 import { v4 as uuidv4 } from "uuid";
 
@@ -8,6 +12,8 @@ interface Props {
 }
 
 export default function PatientForm({ onAddPatient }: Props) {
+  const navigation = useNavigation();
+
   //Estados de los campos
   const [nombre, setNombre] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
@@ -16,11 +22,12 @@ export default function PatientForm({ onAddPatient }: Props) {
 
   //validaciones
   const isNonEmpty = (s: string) => s.trim().length > 0;
-  const isDataLike = (s: string) =>  /^\d{4}-\d{2}-\d{2}$/.test(s.trim()) || /^\d{2}\/\d{2}\/\d{4}$/.test(s.trim());
+  const isDataLike = (s: string) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(s.trim()) || /^\d{2}\/\d{2}\/\d{4}$/.test(s.trim());
 
   const handleSubmit = () => {
     //validacion de campos obligatorios
-    if (!isNonEmpty (nombre) || !isNonEmpty (sintomas)) {
+    if (!isNonEmpty(nombre) || !isNonEmpty(sintomas)) {
       Alert.alert("Validación", "El nombre y sintomas son obligatorios.");
       return;
     }
@@ -28,25 +35,20 @@ export default function PatientForm({ onAddPatient }: Props) {
       Alert.alert("Validación", "Los síntomas son requeridos.");
       return;
     }
-    //validacion de fecha
+    //validacion de urgencia
     if (![1, 2, 3].includes(urgencia)) {
       Alert.alert("Validación", "La urgencia debe ser 1, 2 o 3.");
       return;
     }
+    //validacion de fecha 
     if (fechaNacimiento && !/^\d{4}-\d{2}-\d{2}$/.test(fechaNacimiento)) {
       Alert.alert("Validación", "Usa formato de fecha YYYY-MM-DD.");
       return;
     }
-    
- // 3) Validar urgencia
-    if (![1, 2, 3].includes(urgencia)) {
-      Alert.alert("Urgencia inválida", "Debe ser 1 (alta), 2 (media) o 3 (baja).");
-      return;
-    }
 
-    // 4) Construir el paciente con IDs
+    // Construir el paciente con IDs
     const id = uuidv4(); // id único del registro
-    const expediente = `EXP-${uuidv4().slice(0, 8).toUpperCase()}`; // corto y legible
+    const expediente = `EXP-${uuidv4().slice(0, 8).toUpperCase()}`; 
 
     const nuevoPaciente: Patient = {
       id,
@@ -57,14 +59,27 @@ export default function PatientForm({ onAddPatient }: Props) {
       expediente,
     };
 
-    // 5) Enviar al padre y limpiar
+    // Enviar al padre y limpiar
     onAddPatient(nuevoPaciente);
     setNombre("");
     setFechaNacimiento("");
     setSintomas("");
     setUrgencia(3);
 
-    Alert.alert("Éxito", "Paciente registrado en la lista de espera.");
+    // Mostrar alerta y luego redirigir a Lista
+    Alert.alert("Éxito", "Paciente registrado en la lista de espera.", [
+      {
+        text: "OK",
+        onPress: () => {
+          // Forzamos cambio de tab
+          navigation.dispatch(
+            CommonActions.navigate({
+              name: "Lista",
+            })
+          );
+        },
+      },
+    ]);
   };
 
   return (
