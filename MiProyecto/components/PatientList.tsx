@@ -2,8 +2,10 @@ import React from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
 import { Patient } from "../models/Patient";
 
+
 interface Props {
   patients: Patient[];
+    onServeNext?: () => void;
 }
 
 function prioridadLabel(p: 1 | 2 | 3) {

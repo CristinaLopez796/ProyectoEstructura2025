@@ -16,7 +16,7 @@ export class ColaPrioridad {
 
     if (urgencia === 1) {
       Paciente_nuevo.next = this.alta;
-      this.alta = nuevo;
+      this.alta = Paciente_nuevo;
     } else if (urgencia === 2) {
       Paciente_nuevo.next = this.media;
       this.media = Paciente_nuevo;

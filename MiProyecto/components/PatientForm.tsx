@@ -2,10 +2,11 @@
 import 'react-native-get-random-values';
 
 import React, { useState } from "react";
-import { View, TextInput, Button, StyleSheet, Alert } from "react-native";
+import { View, TextInput, Button, StyleSheet, Alert, Text } from "react-native";
 import { useNavigation, CommonActions } from "@react-navigation/native"; // CommonActions
 import { Patient } from "../models/Patient";
 import { v4 as uuidv4 } from "uuid";
+import { Picker } from "@react-native-picker/picker";
 
 interface Props {
   onAddPatient: (patient: Patient) => void;
@@ -103,18 +104,20 @@ export default function PatientForm({ onAddPatient }: Props) {
         style={[styles.input, { minHeight: 80 }]}
         multiline
       />
-      <TextInput
-        placeholder="Urgencia (1=alta, 2=media, 3=baja)"
-        value={String(urgencia)}
-        onChangeText={(txt) => {
-          const n = Number(txt);
-          if ([1, 2, 3].includes(n)) setUrgencia(n as 1 | 2 | 3);
-          else if (txt.trim() === "") setUrgencia(3);
-        }}
-        style={styles.input}
-        keyboardType="numeric"
-        maxLength={1}
-      />
+        {/* 👇 Aquí cambiamos el TextInput por Picker */}
+      <Text style={{ marginBottom: 4, fontWeight: "600" }}>Nivel de urgencia:</Text>
+      <View style={styles.pickerWrapper}>
+        <Picker
+          selectedValue={urgencia}
+          onValueChange={(value) => setUrgencia(value as 1 | 2 | 3)}
+          style={{ height: 50 }}
+        >
+          <Picker.Item label="Alta (1)" value={1} />
+          <Picker.Item label="Media (2)" value={2} />
+          <Picker.Item label="Baja (3)" value={3} />
+        </Picker>
+      </View>
+
       <Button title="Registrar Paciente" onPress={handleSubmit} />
     </View>
   );
@@ -128,6 +131,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     padding: 10,
     borderRadius: 10,
+    backgroundColor: "#fff",
+  },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    marginBottom: 10,
     backgroundColor: "#fff",
   },
 });
