@@ -2,17 +2,16 @@
 import { Patient } from "../../models/Patient";
 
 export type HeapNode = {
-  id: string;           // id del paciente (para indexarlo)
-  priority: 1 | 2 | 3;  // 1=Alta, 2=Media, 3=Baja  (min-heap por prioridad)
+  id: string;           
+  priority: 1 | 2 | 3;  // 1=Alta, 2=Media, 3=Baja  
   createdAt: number;    // desempate: primero el más antiguo
-  value: Patient;       // el paciente
+  value: Patient;      
 };
 
 export default class PriorityQueue {
   private heap: HeapNode[] = [];
-  private index: Map<string, number> = new Map(); // id -> índice en heap
+  private index: Map<string, number> = new Map(); 
 
-  /** Tamaño actual */
   size() { return this.heap.length; }
 
   /** Inserta un paciente con prioridad y timestamp */
@@ -24,7 +23,6 @@ export default class PriorityQueue {
     this.heapifyUp(i);
   }
 
-  /** Mira el siguiente (sin quitar) */
   peek(): HeapNode | undefined {
     return this.heap[0];
   }
@@ -71,16 +69,15 @@ export default class PriorityQueue {
     }
   }
 
-  /** Snapshot ordenado (no muta el heap) */
   toArrayOrdered(): HeapNode[] {
-    // copia y ordena por comparator (prioridad, createdAt)
+
     return [...this.heap].sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
       return a.createdAt - b.createdAt;
     });
   }
 
-  /** Reconstruir desde un arreglo de pacientes (útil al hidratar) */
+  /** Reconstruir desde un arreglo de pacientes */
   rebuildFrom(patients: Patient[]) {
     this.heap = [];
     this.index.clear();
@@ -110,7 +107,6 @@ export default class PriorityQueue {
     this.index.set(this.heap[j].id, j);
   }
 
-  /** retorna <0 si a<b; 0 iguales; >0 si a>b por (priority, createdAt) */
   private compare(i: number, j: number): number {
     const a = this.heap[i], b = this.heap[j];
     if (a.priority !== b.priority) return a.priority - b.priority;

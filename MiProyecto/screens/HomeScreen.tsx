@@ -1,27 +1,38 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react"; 
 import { View, SafeAreaView, Alert } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {Text, FlatList, StyleSheet, Button } from "react-native";
 
 import PatientForm from "../components/PatientForm";
 import PatientList from "../components/PatientList";
 import { Patient } from "../models/Patient";
 import PriorityQueue from "./lib/priorityQueue";
+import LinkedList from "./lib/linkedList";
+import HistoryScreen, { HistoryItem } from "./HistoryScreen";
+import Stack from "./lib/stack";
 
-type RootTabParamList = { Registrar: undefined; Lista: undefined };
+type RootTabParamList = { Registrar: undefined; Lista: undefined; Historial: undefined }; // 'Historial'
 const Tab = createBottomTabNavigator<RootTabParamList>();
+
 const STORAGE_KEY = "patients:v1";
+const STORAGE_HISTORY = "history:v1"; 
+const STORAGE_STACK = "stack:v1";      
 
 export default function HomeScreen() {
-  // Estado que ya usas (y que persistimos)
+
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]); // historial para UI/persistencia
+  const [undoStack, setUndoStack] = useState<HistoryItem[]>([]); // pila para UI/persistencia
 
-  // Heap de prioridad (vive fuera del estado React, no se re-crea)
+  // Estructuras de datos
   const pqRef = useRef(new PriorityQueue());
+  const historyRef = useRef(new LinkedList<HistoryItem>()); // lista enlazada real
+  const stackRef = useRef(new Stack<HistoryItem>());        // pila real
 
-  // Al iniciar: carga del storage y reconstruye el heap
+  // carga pacientes y reconstruye heap
   useEffect(() => {
     (async () => {
       try {
@@ -37,6 +48,38 @@ export default function HomeScreen() {
     })();
   }, []);
 
+  // carga historial y reconstruye lista enlazada
+  useEffect(() => {
+    (async () => {
+      try {
+        const rawH = await AsyncStorage.getItem(STORAGE_HISTORY);
+        const parsedH: HistoryItem[] | null = rawH ? JSON.parse(rawH) : null;
+        if (parsedH && Array.isArray(parsedH)) {
+          setHistory(parsedH);
+          historyRef.current.rebuildFrom(parsedH);
+        }
+      } catch (e) {
+        console.warn("No se pudo cargar historial:", e);
+      }
+    })();
+  }, []);
+
+  // carga pila (undo) y reconstruye
+  useEffect(() => {
+    (async () => {
+      try {
+        const rawS = await AsyncStorage.getItem(STORAGE_STACK);
+        const parsedS: HistoryItem[] | null = rawS ? JSON.parse(rawS) : null;
+        if (parsedS && Array.isArray(parsedS)) {
+          setUndoStack(parsedS);
+          stackRef.current.rebuildFrom(parsedS);
+        }
+      } catch (e) {
+        console.warn("No se pudo cargar pila (undo):", e);
+      }
+    })();
+  }, []);
+
   // Guardar cada cambio en pacientes
   useEffect(() => {
     (async () => {
@@ -48,31 +91,85 @@ export default function HomeScreen() {
     })();
   }, [patients]);
 
-  // Agregar un paciente (se agrega al arreglo y al heap)
+  // Guardar cada cambio en historial
+  useEffect(() => {
+    (async () => {
+      try {
+        await AsyncStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
+      } catch (e) {
+        console.warn("No se pudo guardar historial:", e);
+      }
+    })();
+  }, [history]);
+
+  // Guardar cada cambio en la pila 
+  useEffect(() => {
+    (async () => {
+      try {
+        await AsyncStorage.setItem(STORAGE_STACK, JSON.stringify(undoStack));
+      } catch (e) {
+        console.warn("No se pudo guardar pila (undo):", e);
+      }
+    })();
+  }, [undoStack]);
+
+  // Agregar un paciente
   const handleAddPatient = (p: Patient) => {
     setPatients((prev) => [...prev, p]); // persistimos así por ahora
     pqRef.current.insert(p, p.urgencia, Date.now());
   };
 
-  // Lista ordenada desde el heap (así ves la prioridad real)
+  // Lista ordenada desde el heap 
   const orderedPatients: Patient[] = useMemo(() => {
     return pqRef.current.toArrayOrdered().map((n: any) => n.value as Patient);
-  }, [patients]); // se re-mapea cuando cambia el arreglo base
+  }, [patients]);
 
-  // Atender siguiente (saca del heap y lo quita del arreglo)
+  // Atender siguiente 
   const serveNext = () => {
     const next = pqRef.current.pop();
     if (!next) {
       Alert.alert("Información", "No hay pacientes en la lista de espera.");
       return;
     }
-    // quitarlo del arreglo base (lo que persistimos)
+   
     setPatients((prev) => prev.filter((p) => p.id !== next.value.id));
-    // TODO (siguiente fase): pasarlo al historial (lista enlazada) y a pila
+
+    //crear item de historial y añadir a la lista enlazada
+    const item: HistoryItem = { paciente: next.value, atendidoEn: Date.now() };
+    historyRef.current.append(item);
+    setHistory(historyRef.current.toArray()); // sincroniza UI/persistencia
+
+    // push en pila para poder deshacer
+    stackRef.current.push(item);
+    setUndoStack(stackRef.current.toArray());
+
     Alert.alert(
       "Atendido",
       `Se atendió a: ${next.value.nombre} (prioridad ${next.value.urgencia})`
     );
+  };
+
+  const undoLast = () => {
+    const last = stackRef.current.pop();
+    if (!last) {
+      Alert.alert("Información", "No hay acciones para deshacer.");
+      return;
+    }
+
+    // Quitar el último del historial 
+    const newHistory = history.slice(0, -1);
+    historyRef.current.rebuildFrom(newHistory);
+    setHistory(newHistory);
+
+    //  Regresar el paciente a la lista de espera 
+    const p = last.paciente;
+    setPatients((prev) => [...prev, p]);
+    pqRef.current.insert(p, p.urgencia, Date.now());
+
+    // Actualizar la pila en UI/persistencia
+    setUndoStack(stackRef.current.toArray());
+
+    Alert.alert("Deshecho", `Se regresó a ${p.nombre} a la lista de espera.`);
   };
 
   return (
@@ -95,6 +192,19 @@ export default function HomeScreen() {
                   <PatientList
                     patients={orderedPatients}
                     onServeNext={serveNext}
+                  />
+                </View>
+              )}
+            </Tab.Screen>
+
+            {/*Pestaña: Historial */}
+            <Tab.Screen name="Historial" options={{ title: "Historial" }}>
+              {() => (
+                <View style={{ flex: 1 }}>
+                  <HistoryScreen
+                    items={history}
+                    onUndo={undoLast}
+                    canUndo={undoStack.length > 0}
                   />
                 </View>
               )}
