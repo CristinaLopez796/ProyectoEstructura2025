@@ -13,8 +13,9 @@ import PriorityQueue from "./lib/priorityQueue";
 import LinkedList from "./lib/linkedList";
 import HistoryScreen, { HistoryItem } from "./HistoryScreen";
 import Stack from "./lib/stack";
+import StatsScreen from "./StatsScreen";
 
-type RootTabParamList = { Registrar: undefined; Lista: undefined; Historial: undefined }; // 'Historial'
+type RootTabParamList = { Registrar: undefined; Lista: undefined; Historial: undefined;  Estadísticas: undefined}; // 'Historial'
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 const STORAGE_KEY = "patients:v1";
@@ -125,26 +126,28 @@ export default function HomeScreen() {
   }, [patients]);
 
   // Atender siguiente 
-  const serveNext = () => {
-    const next = pqRef.current.pop();
-    if (!next) {
-      Alert.alert("Información", "No hay pacientes en la lista de espera.");
-      return;
-    }
-   
-    setPatients((prev) => prev.filter((p) => p.id !== next.value.id));
+  // Atender siguiente (saca del heap y lo quita del arreglo) + lo pasa a historial y a la pila
+const serveNext = () => {
+  const next = pqRef.current.pop();
+  if (!next) {
+    Alert.alert("Información", "No hay pacientes en la lista de espera.");
+    return;
+  }
+  setPatients((prev) => prev.filter((p) => p.id !== next.value.id));
 
-    //crear item de historial y añadir a la lista enlazada
-    const item: HistoryItem = { paciente: next.value, atendidoEn: Date.now() };
-    historyRef.current.append(item);
-    setHistory(historyRef.current.toArray()); // sincroniza UI/persistencia
+  const now = Date.now();
+  const queuedAt = next.value.queuedAt ?? now; // compat datos viejos
+  const waitedMs = Math.max(0, now - queuedAt);
 
-    // push en pila para poder deshacer
-    stackRef.current.push(item);
-    setUndoStack(stackRef.current.toArray());
+  const item: HistoryItem = { paciente: next.value, atendidoEn: now, waitedMs };
+  historyRef.current.append(item);
+  setHistory(historyRef.current.toArray());
 
-    Alert.alert(
-      "Atendido",
+  stackRef.current.push(item);
+  setUndoStack(stackRef.current.toArray());
+
+  Alert.alert("Atendido",
+
       `Se atendió a: ${next.value.nombre} (prioridad ${next.value.urgencia})`
     );
   };
@@ -209,6 +212,16 @@ export default function HomeScreen() {
                 </View>
               )}
             </Tab.Screen>
+
+             {/* Aquí agregas la nueva pestaña */}
+  <Tab.Screen name="Estadísticas" options={{ title: "Estadísticas" }}>
+    {() => (
+      <View style={{ flex: 1 }}>
+        <StatsScreen queue={orderedPatients} history={history} />
+      </View>
+    )}
+  </Tab.Screen>
+
           </Tab.Navigator>
         </SafeAreaView>
       </NavigationContainer>

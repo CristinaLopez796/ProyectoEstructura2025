@@ -58,6 +58,7 @@ export default function PatientForm({ onAddPatient }: Props) {
       sintomas: sintomas.trim(),
       urgencia,
       expediente,
+       queuedAt: Date.now(),
     };
 
     // Enviar al padre y limpiar

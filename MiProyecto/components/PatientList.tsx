@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, FlatList, StyleSheet, Button } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, FlatList, StyleSheet, Button, TextInput } from "react-native";
 import { Patient } from "../models/Patient";
 
 interface Props {
@@ -20,41 +20,56 @@ function prioridadColor(p: 1 | 2 | 3) {
 }
 
 export default function PatientList({ patients, onServeNext }: Props) {
+  const [query, setQuery] = useState("");
+
   // Orden por prioridad (1->3)
-  const sorted = [...patients].sort((a, b) => a.urgencia - b.urgencia);
+  const sorted = useMemo(
+    () => [...patients].sort((a, b) => a.urgencia - b.urgencia),
+    [patients]
+  );
+
+  // Filtro por nombre (case-insensitive, trim)
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((p) => p.nombre.toLowerCase().includes(q));
+  }, [sorted, query]);
 
   return (
     <View style={{ flex: 1 }}>
       {/* Barra superior con contador y botón */}
       <View style={styles.topBar}>
-        <Text style={styles.topBarTitle}>En espera: {patients.length}</Text>
-        {onServeNext && (
-          <Button title="Atender siguiente" onPress={onServeNext} />
-        )}
+        <Text style={styles.topBarTitle}>En espera: {filtered.length}</Text>
+        {onServeNext && <Button title="Atender siguiente" onPress={onServeNext} />}
+      </View>
+
+      {/* Buscador */}
+      <View style={styles.searchBox}>
+        <TextInput
+          placeholder="Buscar por nombre..."
+          value={query}
+          onChangeText={setQuery}
+          style={styles.searchInput}
+        />
       </View>
 
       {/* Lista de pacientes */}
       <FlatList
-        data={sorted}
+        data={filtered}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={{ color: "#666" }}>No hay pacientes en espera.</Text>
+            <Text style={{ color: "#666" }}>
+              {query ? "No hay resultados para la búsqueda." : "No hay pacientes en espera."}
+            </Text>
           </View>
         }
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.headerRow}>
               <Text style={styles.name}>{item.nombre}</Text>
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: prioridadColor(item.urgencia) },
-                ]}
-              >
-                <Text style={styles.badgeText}>
-                  {prioridadLabel(item.urgencia)}
-                </Text>
+              <View style={[styles.badge, { backgroundColor: prioridadColor(item.urgencia) }]}>
+                <Text style={styles.badgeText}>{prioridadLabel(item.urgencia)}</Text>
               </View>
             </View>
             <Text style={styles.meta}>Expediente: {item.expediente}</Text>
@@ -65,6 +80,7 @@ export default function PatientList({ patients, onServeNext }: Props) {
           </View>
         )}
         contentContainerStyle={{ paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
       />
     </View>
   );
@@ -79,6 +95,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   topBarTitle: { fontSize: 16, fontWeight: "600" },
+  searchBox: { paddingHorizontal: 12, paddingBottom: 6 },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
+  },
   empty: { padding: 20, alignItems: "center" },
   card: {
     padding: 14,
@@ -94,11 +119,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   name: { fontWeight: "600", fontSize: 16 },
   meta: { color: "#555", marginTop: 2 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
