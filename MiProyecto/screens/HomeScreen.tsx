@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, SafeAreaView, Alert } from "react-native";
+import { View, SafeAreaView, Alert, Pressable } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -28,7 +28,7 @@ const STORAGE_KEY = "patients:v1";
 const STORAGE_HISTORY = "history:v1";
 const STORAGE_STACK = "stack:v1";
 
-export default function HomeScreen() {
+export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [undoStack, setUndoStack] = useState<HistoryItem[]>([]);
@@ -115,6 +115,14 @@ export default function HomeScreen() {
     })();
   }, [undoStack]);
 
+  const confirmLogout = () => {
+  if (!onLogout) return;
+    Alert.alert("Cerrar sesión", "¿Deseas salir de la aplicación?", [
+      { text: "Cancelar", style: "cancel" },
+    { text: "Cerrar sesión", style: "destructive", onPress: onLogout },
+    ]);
+  };
+
   // ---------- Lógica de negocio ----------
   const handleAddPatient = (p: Patient) => {
     setPatients((prev) => [...prev, p]);
@@ -167,6 +175,7 @@ export default function HomeScreen() {
     Alert.alert("Deshecho", `Se regresó a ${p.nombre} a la lista de espera.`);
   };
 
+
   // ---------- UI ----------
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -201,8 +210,18 @@ export default function HomeScreen() {
           >
             <Tab.Screen
                 name="Registrar"
-                options={{ title: "Registrar Paciente" }}
-              >
+                options={{ title: "Registrar Paciente",
+                  headerRight: () => (
+                    <Pressable onPress={confirmLogout} hitSlop={10} style={{ paddingHorizontal: 10,
+                      paddingVertical: 6 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Cerrar sesión"
+                      >
+                        <Ionicons name="log-out-outline" size={22} color={COLORS.text} />
+                      </Pressable>
+                  ),
+                 }}
+            >
                 {() => (
                   <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
                     <PatientForm onAddPatient={handleAddPatient} />
@@ -215,6 +234,15 @@ export default function HomeScreen() {
               options={{
                 title: "Lista de espera",
                 tabBarBadge: orderedPatients.length > 0 ? orderedPatients.length : undefined,
+                headerRight: () => (
+                  <Pressable onPress={confirmLogout} hitSlop={12}
+                  style={{ paddingHorizontal: 10, paddingVertical: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar sesión"
+                  >
+                    <Ionicons name="log-out-outline" size={22} color={COLORS.text} />
+                  </Pressable>
+                ),
               }}
             >
               {() => (
@@ -229,6 +257,15 @@ export default function HomeScreen() {
               options={{
                 title: "Historial",
                 tabBarBadge: history.length > 0 ? history.length : undefined,
+                headerRight: () => (
+                  <Pressable onPress={confirmLogout} hitSlop={12}
+                  style={{ paddingHorizontal: 10, paddingVertical: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar sesión"
+                  >
+                    <Ionicons name="log-out-outline" size={22} color={COLORS.text} />
+                  </Pressable>
+                ),
               }}
             >
               {() => (
@@ -238,7 +275,17 @@ export default function HomeScreen() {
               )}
             </Tab.Screen>
 
-            <Tab.Screen name="Estadísticas" options={{ title: "Estadísticas" }}>
+            <Tab.Screen name="Estadísticas" options={{ title: "Estadísticas",
+              headerRight: () => (
+                <Pressable onPress={confirmLogout} hitSlop={12}
+                style={{ paddingHorizontal: 10, paddingVertical: 6 }}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar sesión"
+                >
+                  <Ionicons name="log-out-outline" size={22} color={COLORS.text} />
+                </Pressable>
+              ),
+             }}>
                 {() => (
                   <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
                     <StatsScreen queue={orderedPatients} history={history} />

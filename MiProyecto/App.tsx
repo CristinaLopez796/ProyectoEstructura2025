@@ -1,17 +1,14 @@
 import 'react-native-gesture-handler';
-import React from "react";
+import React, { useState } from "react";
 import HomeScreen from "./screens/HomeScreen";
-import { StyleSheet, Text, View } from 'react-native';
+import LoginScreen from "./components/LoginScreen";
 
 export default function App() {
-  return <HomeScreen /> ;
-}
+  const [authed, setAuthed] = useState(false);
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+  if (!authed) {
+    return <LoginScreen onSuccess={() => setAuthed(true)} />;
+  }
+
+  return <HomeScreen onLogout={() => setAuthed(false)} />;
+}
