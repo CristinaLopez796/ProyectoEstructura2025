@@ -1,4 +1,3 @@
-// screens/lib/stack.ts
 export default class Stack<T> {
   private data: T[] = [];
 

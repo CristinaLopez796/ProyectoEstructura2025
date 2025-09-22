@@ -1,4 +1,3 @@
-// lib/priorityQueue.ts
 import { Patient } from "../../models/Patient";
 
 export type HeapNode = {

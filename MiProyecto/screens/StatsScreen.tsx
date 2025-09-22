@@ -2,11 +2,10 @@ import React, { useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { Patient } from "../models/Patient";
 import { HistoryItem } from "./HistoryScreen";
+import { COLORS } from "../theme/colors";
+import { Ionicons } from "@expo/vector-icons";
 
-type Props = {
-  queue: Patient[];
-  history: HistoryItem[];
-};
+type Props = { queue: Patient[]; history: HistoryItem[] };
 
 function fmtMs(ms: number) {
   if (!isFinite(ms) || ms <= 0) return "0m";
@@ -71,10 +70,13 @@ export default function StatsScreen({ queue, history }: Props) {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#F6F7FB" }} contentContainerStyle={{ paddingBottom: 16 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: COLORS.bg }} contentContainerStyle={{ paddingBottom: 16 }}>
       {/* En espera */}
       <View style={styles.card}>
-        <Text style={styles.title}>En espera</Text>
+        <View style={styles.cardHeader}>
+          <Ionicons name="people-outline" size={18} color={COLORS.tabActive} />
+          <Text style={styles.title}>En espera</Text>
+        </View>
         <View style={styles.rowBetween}>
           <Text style={styles.metricLabel}>Total</Text>
           <Text style={styles.metricValue}>{queue.length}</Text>
@@ -83,27 +85,30 @@ export default function StatsScreen({ queue, history }: Props) {
         <View style={styles.separator} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: "#0284C7" }]}><Text style={styles.pillText}>Alta (1)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p1 }]}><Text style={styles.pillText}>Alta (1)</Text></View>
           <Text style={styles.countText}>{queueCounts.p1}</Text>
         </View>
-        <Bar value={queueCounts.p1} max={maxCountQueue} color="#0284C7" />
+        <Bar value={queueCounts.p1} max={maxCountQueue} color={COLORS.priority.p1} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: "#8B5CF6" }]}><Text style={styles.pillText}>Media (2)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p2 }]}><Text style={styles.pillText}>Media (2)</Text></View>
           <Text style={styles.countText}>{queueCounts.p2}</Text>
         </View>
-        <Bar value={queueCounts.p2} max={maxCountQueue} color="#8B5CF6" />
+        <Bar value={queueCounts.p2} max={maxCountQueue} color={COLORS.priority.p2} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: "#22C55E" }]}><Text style={styles.pillText}>Baja (3)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p3 }]}><Text style={styles.pillText}>Baja (3)</Text></View>
           <Text style={styles.countText}>{queueCounts.p3}</Text>
         </View>
-        <Bar value={queueCounts.p3} max={maxCountQueue} color="#22C55E" />
+        <Bar value={queueCounts.p3} max={maxCountQueue} color={COLORS.priority.p3} />
       </View>
 
       {/* Atendidos */}
       <View style={styles.card}>
-        <Text style={styles.title}>Atendidos</Text>
+        <View style={styles.cardHeader}>
+          <Ionicons name="time-outline" size={18} color={COLORS.tabActive} />
+          <Text style={styles.title}>Atendidos</Text>
+        </View>
         <View style={styles.rowBetween}>
           <Text style={styles.metricLabel}>Total</Text>
           <Text style={styles.metricValue}>{history.length}</Text>
@@ -112,31 +117,34 @@ export default function StatsScreen({ queue, history }: Props) {
         <View style={styles.separator} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: "#0284C7" }]}><Text style={styles.pillText}>Alta (1)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p1 }]}><Text style={styles.pillText}>Alta (1)</Text></View>
           <Text style={styles.countText}>{histCounts.p1}</Text>
         </View>
-        <Bar value={histCounts.p1} max={maxCountHist} color="#0284C7" />
+        <Bar value={histCounts.p1} max={maxCountHist} color={COLORS.priority.p1} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: "#8B5CF6" }]}><Text style={styles.pillText}>Media (2)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p2 }]}><Text style={styles.pillText}>Media (2)</Text></View>
           <Text style={styles.countText}>{histCounts.p2}</Text>
         </View>
-        <Bar value={histCounts.p2} max={maxCountHist} color="#8B5CF6" />
+        <Bar value={histCounts.p2} max={maxCountHist} color={COLORS.priority.p2} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: "#22C55E" }]}><Text style={styles.pillText}>Baja (3)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p3 }]}><Text style={styles.pillText}>Baja (3)</Text></View>
           <Text style={styles.countText}>{histCounts.p3}</Text>
         </View>
-        <Bar value={histCounts.p3} max={maxCountHist} color="#22C55E" />
+        <Bar value={histCounts.p3} max={maxCountHist} color={COLORS.priority.p3} />
       </View>
 
       {/* Tiempos promedio */}
       <View style={styles.card}>
-        <Text style={styles.title}>Tiempo promedio de espera</Text>
+        <View style={styles.cardHeader}>
+          <Ionicons name="stopwatch-outline" size={18} color={COLORS.tabActive} />
+          <Text style={styles.title}>Tiempo promedio de espera</Text>
+        </View>
 
         <View style={styles.rowBetween}>
           <Text style={styles.metricLabel}>Global</Text>
-          <Text style={[styles.metricValue, { color: "#0EA5E9" }]}>{fmtMs(avgWaitAll)}</Text>
+          <Text style={[styles.metricValue, { color: COLORS.tabActive }]}>{fmtMs(avgWaitAll)}</Text>
         </View>
 
         <View style={styles.separator} />
@@ -188,7 +196,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  title: { fontWeight: "800", fontSize: 16, marginBottom: 6, color: "#0F172A" },
+  cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 8 },
+  title: { fontWeight: "800", fontSize: 16, color: "#0F172A" },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 2 },
   metricLabel: { color: "#667085", fontSize: 14 },
   metricValue: { color: "#0F172A", fontSize: 14, fontWeight: "700" },
