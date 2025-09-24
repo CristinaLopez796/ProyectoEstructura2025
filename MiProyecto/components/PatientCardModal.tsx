@@ -9,10 +9,10 @@ type Mode = "queue" | "history";
 type Props = {
   visible: boolean;
   mode: Mode;
-  patient: Patient | null;   // si viene de historial: usa item.paciente
+  patient: Patient | null;
   onClose: () => void;
-  onSave: (updated: Patient) => void;   // editar/guardar
-  onDelete?: (patientId: string) => void; // eliminar (en cola) o quitar del historial
+  onSave: (updated: Patient) => void;
+  onDelete?: (patientId: string) => void;
 };
 
 const onlyDigits = (s: string) => s.replace(/[^\d]/g, "");
