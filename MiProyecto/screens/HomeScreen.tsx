@@ -1,53 +1,73 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, SafeAreaView, Alert, Pressable } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import React, { useEffect, useMemo, useRef, useState } from "react"; 
+import { View, SafeAreaView, Alert, Text } from "react-native";
+import {
+  NavigationContainer,
+  DarkTheme as NavDarkTheme,
+  DefaultTheme as NavDefaultTheme,
+} from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import PatientForm from "../components/PatientForm";
 import PatientList from "../components/PatientList";
-import PatientCardModal from "../components/PatientCardModal";
-import HistoryScreen, { HistoryItem } from "./HistoryScreen";
-import StatsScreen from "./StatsScreen";
-
+import { Patient } from "../models/Patient";
 import PriorityQueue from "./lib/priorityQueue";
 import LinkedList from "./lib/linkedList";
+import HistoryScreen, { HistoryItem } from "./HistoryScreen";
 import Stack from "./lib/stack";
-
-import { Patient } from "../models/Patient";
-import { COLORS } from "../theme/colors";
-import { Ionicons } from "@expo/vector-icons";
+import StatsScreen from "./StatsScreen";
+import SettingsScreen from "./SettingsScreen";
 
 type RootTabParamList = {
   Registrar: undefined;
   Lista: undefined;
   Historial: undefined;
-  "Estadísticas": undefined;
+  Estadísticas: undefined;
+  Ajustes: undefined; // 👈 nueva pestaña
 };
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 const STORAGE_KEY = "patients:v1";
-const STORAGE_HISTORY = "history:v1";
+const STORAGE_HISTORY = "history:v1"; 
 const STORAGE_STACK = "stack:v1";
+const STORAGE_DARK = "settings:darkMode"; // 👈 modo oscuro persistido
 
-export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
+export default function HomeScreen() {
+
+  // -------- Modo oscuro --------
+  const [isDark, setIsDark] = useState<boolean>(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_DARK);
+        if (raw) setIsDark(JSON.parse(raw));
+      } catch {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await AsyncStorage.setItem(STORAGE_DARK, JSON.stringify(isDark));
+      } catch {}
+    })();
+  }, [isDark]);
+
+  const navTheme = isDark ? NavDarkTheme : NavDefaultTheme;
+
+  // -------- Estado existente --------
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [undoStack, setUndoStack] = useState<HistoryItem[]>([]);
-
-  // ---- Modal de detalle/edición ----
-  const [detailVisible, setDetailVisible] = useState(false);
-  const [detailMode, setDetailMode] = useState<"queue" | "history">("queue");
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]); // historial
+  const [undoStack, setUndoStack] = useState<HistoryItem[]>([]); // pila (undo)
 
   // Estructuras de datos
   const pqRef = useRef(new PriorityQueue());
   const historyRef = useRef(new LinkedList<HistoryItem>());
   const stackRef = useRef(new Stack<HistoryItem>());
 
-  // ---------- Carga inicial ----------
+  // carga pacientes y reconstruye heap
   useEffect(() => {
     (async () => {
       try {
@@ -63,6 +83,7 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     })();
   }, []);
 
+  // carga historial y reconstruye lista enlazada
   useEffect(() => {
     (async () => {
       try {
@@ -78,6 +99,7 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     })();
   }, []);
 
+  // carga pila (undo) y reconstruye
   useEffect(() => {
     (async () => {
       try {
@@ -93,7 +115,7 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     })();
   }, []);
 
-  // ---------- Persistencia ----------
+  // Guardar cada cambio en pacientes
   useEffect(() => {
     (async () => {
       try {
@@ -104,6 +126,7 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     })();
   }, [patients]);
 
+  // Guardar cada cambio en historial
   useEffect(() => {
     (async () => {
       try {
@@ -114,6 +137,7 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     })();
   }, [history]);
 
+  // Guardar cada cambio en la pila 
   useEffect(() => {
     (async () => {
       try {
@@ -124,24 +148,18 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     })();
   }, [undoStack]);
 
-  const confirmLogout = () => {
-    if (!onLogout) return;
-    Alert.alert("Cerrar sesión", "¿Deseas salir de la aplicación?", [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Cerrar sesión", style: "destructive", onPress: onLogout },
-    ]);
-  };
-
-  // ---------- Lógica de negocio ----------
+  // Agregar un paciente
   const handleAddPatient = (p: Patient) => {
     setPatients((prev) => [...prev, p]);
-    pqRef.current.insert(p, p.urgencia, p.queuedAt ?? Date.now());
+    pqRef.current.insert(p, p.urgencia, Date.now());
   };
 
+  // Lista ordenada desde el heap 
   const orderedPatients: Patient[] = useMemo(() => {
     return pqRef.current.toArrayOrdered().map((n: any) => n.value as Patient);
   }, [patients]);
 
+  // Atender siguiente (heap -> historial + pila)
   const serveNext = () => {
     const next = pqRef.current.pop();
     if (!next) {
@@ -151,7 +169,7 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     setPatients((prev) => prev.filter((p) => p.id !== next.value.id));
 
     const now = Date.now();
-    const queuedAt = next.value.queuedAt ?? now;
+    const queuedAt = next.value.queuedAt ?? now; 
     const waitedMs = Math.max(0, now - queuedAt);
 
     const item: HistoryItem = { paciente: next.value, atendidoEn: now, waitedMs };
@@ -161,7 +179,10 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     stackRef.current.push(item);
     setUndoStack(stackRef.current.toArray());
 
-    Alert.alert("Atendido", `Se atendió a: ${next.value.nombre} (prioridad ${next.value.urgencia})`);
+    Alert.alert(
+      "Atendido",
+      `Se atendió a: ${next.value.nombre} (prioridad ${next.value.urgencia})`
+    );
   };
 
   const undoLast = () => {
@@ -184,102 +205,37 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     Alert.alert("Deshecho", `Se regresó a ${p.nombre} a la lista de espera.`);
   };
 
-  // Guardar cambios desde el modal
-  const savePatientEdits = (updated: Patient) => {
-    if (detailMode === "queue") {
-      // actualizar arreglo base
-      setPatients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      // reacomodar en el heap
-      pqRef.current.removeById(updated.id);
-      pqRef.current.insert(updated, updated.urgencia, updated.queuedAt ?? Date.now());
-    } else {
-      // actualizar historial
-      const newHist = history.map((h, idx) =>
-        idx === (selectedHistoryIndex ?? -1) ? { ...h, paciente: { ...updated } } : h
-      );
-      historyRef.current.rebuildFrom(newHist);
-      setHistory(newHist);
-    }
-    setDetailVisible(false);
-    setSelectedPatient(null);
-    setSelectedHistoryIndex(null);
+  // Emojis para los iconos del tab (sin librerías externas)
+  const tabIconByRoute: Record<keyof RootTabParamList, string> = {
+    Registrar: "➕",
+    Lista: "📋",
+    Historial: "🕒",
+    Estadísticas: "📊",
+    Ajustes: "⚙️",
   };
 
-  // Eliminar desde el modal
-  const deletePatient = (id: string) => {
-    if (detailMode === "queue") {
-      setPatients((prev) => prev.filter((p) => p.id !== id));
-      pqRef.current.removeById(id);
-    } else {
-      const idx = selectedHistoryIndex ?? -1;
-      if (idx >= 0) {
-        const newHist = [...history.slice(0, idx), ...history.slice(idx + 1)];
-        historyRef.current.rebuildFrom(newHist);
-        setHistory(newHist);
-
-        const top = stackRef.current.peek?.() as HistoryItem | undefined;
-        if (top && top.paciente.id === id) {
-          stackRef.current.pop();
-          setUndoStack(stackRef.current.toArray());
-        }
-      }
-    }
-    setDetailVisible(false);
-    setSelectedPatient(null);
-    setSelectedHistoryIndex(null);
-  };
-
-  // ---------- UI ----------
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
-        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
+      <NavigationContainer theme={navTheme}>
+        <SafeAreaView style={{ flex: 1 }}>
           <Tab.Navigator
-            initialRouteName="Registrar"
             screenOptions={({ route }) => ({
               headerShown: true,
-              headerStyle: { backgroundColor: "#fff" },
-              headerTitleStyle: { color: COLORS.text, fontWeight: "800" },
-              headerTintColor: COLORS.text,
-              tabBarActiveTintColor: COLORS.tabActive,
-              tabBarInactiveTintColor: COLORS.tabInactive,
-              tabBarStyle: {
-                backgroundColor: "#fff",
-                borderTopColor: COLORS.border,
-                height: 58,
-              },
-              tabBarLabelStyle: { paddingBottom: 6, fontWeight: "600" },
-              tabBarIcon: ({ color, size }) => {
-                const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
-                  Registrar: "person-add-outline",
-                  Lista: "list-outline",
-                  Historial: "time-outline",
-                  "Estadísticas": "bar-chart-outline",
-                };
-                const name = icons[route.name] ?? "ellipse-outline";
-                return <Ionicons name={name} size={size} color={color} />;
-              },
+              // 👇 Icono por pestaña (emoji)
+              tabBarIcon: ({ color, size, focused }) => (
+                <Text style={{ fontSize: 16, opacity: focused ? 1 : 0.7 }}>
+                  {tabIconByRoute[route.name as keyof RootTabParamList] || "•"}
+                </Text>
+              ),
+              // (mantengo el diseño que ya tenías por defecto)
             })}
           >
             <Tab.Screen
               name="Registrar"
-              options={{
-                title: "Registrar Paciente",
-                headerRight: () => (
-                  <Pressable
-                    onPress={confirmLogout}
-                    hitSlop={10}
-                    style={{ paddingHorizontal: 10, paddingVertical: 6 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Cerrar sesión"
-                  >
-                    <Ionicons name="log-out-outline" size={22} color={COLORS.text} />
-                  </Pressable>
-                ),
-              }}
+              options={{ title: "Registrar Paciente" }}
             >
               {() => (
-                <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+                <View style={{ flex: 1 }}>
                   <PatientForm onAddPatient={handleAddPatient} />
                 </View>
               )}
@@ -289,31 +245,15 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
               name="Lista"
               options={{
                 title: "Lista de espera",
+                // 👇 burbuja de notificación con pacientes en espera
                 tabBarBadge: orderedPatients.length > 0 ? orderedPatients.length : undefined,
-                headerRight: () => (
-                  <Pressable
-                    onPress={confirmLogout}
-                    hitSlop={12}
-                    style={{ paddingHorizontal: 10, paddingVertical: 6 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Cerrar sesión"
-                  >
-                    <Ionicons name="log-out-outline" size={22} color={COLORS.text} />
-                  </Pressable>
-                ),
               }}
             >
               {() => (
-                <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+                <View style={{ flex: 1 }}>
                   <PatientList
                     patients={orderedPatients}
                     onServeNext={serveNext}
-                    onSelect={(p) => {
-                      setSelectedPatient(p);
-                      setDetailMode("queue");
-                      setSelectedHistoryIndex(null);
-                      setDetailVisible(true);
-                    }}
                   />
                 </View>
               )}
@@ -323,70 +263,40 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
               name="Historial"
               options={{
                 title: "Historial",
+                // 👇 burbuja con atendidos
                 tabBarBadge: history.length > 0 ? history.length : undefined,
-                headerRight: () => (
-                  <Pressable
-                    onPress={confirmLogout}
-                    hitSlop={12}
-                    style={{ paddingHorizontal: 10, paddingVertical: 6 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Cerrar sesión"
-                  >
-                    <Ionicons name="log-out-outline" size={22} color={COLORS.text} />
-                  </Pressable>
-                ),
               }}
             >
               {() => (
-                <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+                <View style={{ flex: 1 }}>
                   <HistoryScreen
                     items={history}
                     onUndo={undoLast}
                     canUndo={undoStack.length > 0}
-                    onSelect={(p, index) => {
-                      setSelectedPatient(p);
-                      setDetailMode("history");
-                      setSelectedHistoryIndex(index);
-                      setDetailVisible(true);
-                    }}
                   />
                 </View>
               )}
             </Tab.Screen>
 
-            <Tab.Screen
-              name="Estadísticas"
-              options={{
-                title: "Estadísticas",
-                headerRight: () => (
-                  <Pressable
-                    onPress={confirmLogout}
-                    hitSlop={12}
-                    style={{ paddingHorizontal: 10, paddingVertical: 6 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Cerrar sesión"
-                  >
-                    <Ionicons name="log-out-outline" size={22} color={COLORS.text} />
-                  </Pressable>
-                ),
-              }}
-            >
+            <Tab.Screen name="Estadísticas" options={{ title: "Estadísticas" }}>
               {() => (
-                <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+                <View style={{ flex: 1 }}>
                   <StatsScreen queue={orderedPatients} history={history} />
                 </View>
               )}
             </Tab.Screen>
-          </Tab.Navigator>
 
-          <PatientCardModal
-            visible={detailVisible}
-            mode={detailMode}
-            patient={selectedPatient}
-            onClose={() => setDetailVisible(false)}
-            onSave={savePatientEdits}
-            onDelete={deletePatient}
-          />
+            <Tab.Screen name="Ajustes" options={{ title: "Ajustes" }}>
+              {() => (
+                <View style={{ flex: 1 }}>
+                  <SettingsScreen
+                    isDark={isDark}
+                    onToggleDark={(v) => setIsDark(v)}
+                  />
+                </View>
+              )}
+            </Tab.Screen>
+          </Tab.Navigator>
         </SafeAreaView>
       </NavigationContainer>
     </GestureHandlerRootView>
