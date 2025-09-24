@@ -30,13 +30,12 @@ function prioridadLabel(p: 1 | 2 | 3) {
 }
 
 export default function HistoryScreen({
-  items,
-  onUndo,
-  canUndo,
+  items, onUndo, canUndo, onSelect,
 }: {
   items: HistoryItem[];
   onUndo?: () => void;
   canUndo?: boolean;
+  onSelect?: (p: Patient, index: number) => void;
 }) {
   const [query, setQuery] = useState("");
 
@@ -92,11 +91,11 @@ export default function HistoryScreen({
             </Text>
           </View>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const dt = formatDateTime(item.atendidoEn);
           const p = item.paciente;
           return (
-            <View style={styles.card}>
+            <Pressable style={styles.card} onPress={() => onSelect?.(p, index)}>
               <View style={styles.headerRow}>
                 <Text style={styles.name}>{p.nombre}</Text>
                 <View style={[styles.badge, { backgroundColor: prioridadColor(p.urgencia) }]}>
@@ -116,7 +115,7 @@ export default function HistoryScreen({
                 <Text style={styles.meta}>Espera aprox.: {fmtMs(item.waitedMs)}</Text>
               )}
               <Text style={{ marginTop: 6, color: COLORS.text }}>Síntomas: {p.sintomas}</Text>
-            </View>
+            </Pressable>
           );
         }}
         contentContainerStyle={{ paddingBottom: 40 }}

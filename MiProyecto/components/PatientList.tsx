@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, FlatList, StyleSheet, TextInput, Pressable } from "react-native";
+import { View, Text, FlatList, StyleSheet, Button, TextInput, Pressable, } from "react-native";
 import { Patient } from "../models/Patient";
 import { COLORS } from "../theme/colors";
 import { formatDateISOToPretty, formatDateTime } from "../utils/datetime";
@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 interface Props {
   patients: Patient[];
   onServeNext?: () => void;
+  onSelect?: (p: Patient) => void;
 }
 
 function prioridadLabel(p: 1 | 2 | 3) {
@@ -21,7 +22,7 @@ function prioridadColor(p: 1 | 2 | 3) {
   return COLORS.priority.p3;
 }
 
-export default function PatientList({ patients, onServeNext }: Props) {
+export default function PatientList({ patients, onServeNext, onSelect }: Props) {
   const [query, setQuery] = useState("");
 
   const sorted = useMemo(() => {
@@ -82,7 +83,7 @@ export default function PatientList({ patients, onServeNext }: Props) {
           </View>
         }
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <Pressable style={styles.card} onPress={() => onSelect?.(item)}>
             <View style={styles.headerRow}>
               <Text style={styles.name}>{item.nombre}</Text>
               <View style={[styles.badge, { backgroundColor: prioridadColor(item.urgencia) }]}>
@@ -102,7 +103,7 @@ export default function PatientList({ patients, onServeNext }: Props) {
             )}
             {!!item.queuedAt && <Text style={styles.meta}>Registrado: {formatDateTime(item.queuedAt)}</Text>}
             <Text style={{ marginTop: 6, color: COLORS.text }}>Síntomas: {item.sintomas}</Text>
-          </View>
+          </Pressable>
         )}
         contentContainerStyle={{ paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
