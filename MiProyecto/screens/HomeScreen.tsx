@@ -24,14 +24,14 @@ type RootTabParamList = {
   Lista: undefined;
   Historial: undefined;
   Estadísticas: undefined;
-  Ajustes: undefined; // 👈 nueva pestaña
+  Ajustes: undefined; 
 };
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 const STORAGE_KEY = "patients:v1";
 const STORAGE_HISTORY = "history:v1"; 
 const STORAGE_STACK = "stack:v1";
-const STORAGE_DARK = "settings:darkMode"; // 👈 modo oscuro persistido
+const STORAGE_DARK = "settings:darkMode"; // 
 
 export default function HomeScreen() {
 
@@ -205,7 +205,7 @@ export default function HomeScreen() {
     Alert.alert("Deshecho", `Se regresó a ${p.nombre} a la lista de espera.`);
   };
 
-  // Emojis para los iconos del tab (sin librerías externas)
+  // Emojis para los iconos del tab 
   const tabIconByRoute: Record<keyof RootTabParamList, string> = {
     Registrar: "➕",
     Lista: "📋",
@@ -221,13 +221,13 @@ export default function HomeScreen() {
           <Tab.Navigator
             screenOptions={({ route }) => ({
               headerShown: true,
-              // 👇 Icono por pestaña (emoji)
+           
               tabBarIcon: ({ color, size, focused }) => (
                 <Text style={{ fontSize: 16, opacity: focused ? 1 : 0.7 }}>
                   {tabIconByRoute[route.name as keyof RootTabParamList] || "•"}
                 </Text>
               ),
-              // (mantengo el diseño que ya tenías por defecto)
+             
             })}
           >
             <Tab.Screen
@@ -245,7 +245,7 @@ export default function HomeScreen() {
               name="Lista"
               options={{
                 title: "Lista de espera",
-                // 👇 burbuja de notificación con pacientes en espera
+                // burbuja de notificación con pacientes en espera
                 tabBarBadge: orderedPatients.length > 0 ? orderedPatients.length : undefined,
               }}
             >
@@ -263,7 +263,7 @@ export default function HomeScreen() {
               name="Historial"
               options={{
                 title: "Historial",
-                // 👇 burbuja con atendidos
+                // burbuja con atendidos
                 tabBarBadge: history.length > 0 ? history.length : undefined,
               }}
             >
