@@ -1,21 +1,60 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, TextInput, StyleSheet, Pressable } from "react-native";
+import { View, Text, TextInput, StyleSheet, Pressable, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../theme/colors";
+import { supabaseAuth } from "../utils/supabaseAuth";
 
 type Props = {
   onSuccess: () => void;
 };
 
 export default function LoginScreen({ onSuccess }: Props) {
-  const [pin, setPin] = useState("");
-  const [showPin, setShowPin] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  
-  const puedeEntrar = useMemo(() => pin.trim().length >= 4, [pin]);
+  const isFormValid = useMemo(() =>
+    email.trim().length > 0 && password.trim().length >= 6,
+    [email, password]
+  );
 
-  const doLogin = () => {
-    if (puedeEntrar) onSuccess();
+  const doLogin = async () => {
+    if (!isFormValid) return;
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabaseAuth.signIn(email, password);
+
+      if (error) {
+        Alert.alert("Error de inicio de sesión", error.message);
+      } else if (data?.session) {
+        onSuccess();
+      }
+    } catch (err) {
+      Alert.alert("Error", "Ocurrió un error durante el inicio de sesión");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const doSignUp = async () => {
+    if (!isFormValid) return;
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabaseAuth.signUp(email, password);
+
+      if (error) {
+        Alert.alert("Error de registro", error.message);
+      } else {
+        Alert.alert("Registro exitoso", "Verifica tu correo para confirmar tu cuenta");
+      }
+    } catch (err) {
+      Alert.alert("Error", "Ocurrió un error durante el registro");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -24,39 +63,75 @@ export default function LoginScreen({ onSuccess }: Props) {
         <View style={styles.titleRow}>
           <Ionicons name="lock-closed-outline" size={26} color={COLORS.tabActive} />
           <View style={{ marginLeft: 10 }}>
-            <Text style={styles.title}>Acceso</Text>
-            <Text style={styles.sub}>Ingresa un PIN de 4+ dígitos para continuar</Text>
+            <Text style={styles.title}>Acceso Seguro</Text>
+            <Text style={styles.sub}>Inicia sesión con tu cuenta Supabase</Text>
           </View>
         </View>
 
-        <Text style={styles.label}>PIN</Text>
+        <Text style={styles.label}>Correo Electrónico</Text>
         <View style={styles.inputRow}>
-          <Ionicons name="key-outline" size={16} color={COLORS.textMuted} style={{ marginRight: 8 }} />
+          <Ionicons name="mail-outline" size={16} color={COLORS.textMuted} style={{ marginRight: 8 }} />
           <TextInput
-            value={pin}
-            onChangeText={(t) => setPin(t.replace(/[^\d]/g, "").slice(0, 6))}
-            placeholder="••••"
-            keyboardType="number-pad"
-            secureTextEntry={!showPin}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="tu@email.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!loading}
             style={styles.input}
             placeholderTextColor={COLORS.textMuted}
           />
-          <Pressable onPress={() => setShowPin((v) => !v)}>
-            <Ionicons name={showPin ? "eye-outline" : "eye-off-outline"} size={18} color={COLORS.textMuted} />
+        </View>
+
+        <Text style={styles.label}>Contraseña</Text>
+        <View style={styles.inputRow}>
+          <Ionicons name="key-outline" size={16} color={COLORS.textMuted} style={{ marginRight: 8 }} />
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••"
+            secureTextEntry={!showPassword}
+            editable={!loading}
+            style={styles.input}
+            placeholderTextColor={COLORS.textMuted}
+          />
+          <Pressable onPress={() => setShowPassword((v) => !v)} disabled={loading}>
+            <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={18} color={COLORS.textMuted} />
           </Pressable>
         </View>
 
         <Pressable
           onPress={doLogin}
-          disabled={!puedeEntrar}
-          style={[styles.primaryBtn, !puedeEntrar && { opacity: 0.6 }]}
+          disabled={!isFormValid || loading}
+          style={[styles.primaryBtn, (!isFormValid || loading) && { opacity: 0.6 }]}
         >
-          <Ionicons name="log-in-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.primaryBtnText}>Ingresar</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="log-in-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.primaryBtnText}>Iniciar Sesión</Text>
+            </>
+          )}
+        </Pressable>
+
+        <View style={styles.divider} />
+
+        <Pressable
+          onPress={doSignUp}
+          disabled={!isFormValid || loading}
+          style={[styles.secondaryBtn, (!isFormValid || loading) && { opacity: 0.6 }]}
+        >
+          {loading ? null : (
+            <>
+              <Ionicons name="person-add-outline" size={18} color={COLORS.tabActive} style={{ marginRight: 6 }} />
+              <Text style={styles.secondaryBtnText}>Crear Cuenta</Text>
+            </>
+          )}
         </Pressable>
 
         <Text style={styles.note}>
-          Este acceso es solo para fines de clase. No se almacena ninguna información.
+          Usa Supabase para autenticación segura
         </Text>
       </View>
     </View>
@@ -109,5 +184,24 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: 12,
+  },
+
+  secondaryBtn: {
+    backgroundColor: "#f0f0f0",
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  secondaryBtnText: { color: COLORS.tabActive, fontWeight: "800", fontSize: 15 },
+
   note: { color: COLORS.textMuted, fontSize: 12, marginTop: 12, textAlign: "center" },
 });
