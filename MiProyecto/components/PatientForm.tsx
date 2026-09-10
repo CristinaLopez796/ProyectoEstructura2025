@@ -50,6 +50,62 @@ function prioridadColor(p: 1 | 2 | 3, colors: Palette) {
   return colors.priority.p3;
 }
 
+type Estilos = ReturnType<typeof crearEstilos>;
+
+/** Línea de ayuda / error debajo de un campo. */
+function FieldHint({
+  error,
+  hint,
+  ok,
+  styles,
+  colors,
+}: {
+  error?: string;
+  hint: string;
+  ok?: boolean;
+  styles: Estilos;
+  colors: Palette;
+}) {
+  return (
+    <View style={styles.helpRow}>
+      <Ionicons
+        name={error ? "alert-circle" : ok ? "checkmark-circle" : "information-circle-outline"}
+        size={14}
+        color={error ? colors.danger : ok ? colors.priority.p3 : colors.textMuted}
+        style={{ marginRight: 4 }}
+      />
+      <Text style={[styles.help, error ? styles.helpError : null]}>{error || hint}</Text>
+    </View>
+  );
+}
+
+/** Cabecera de sección con icono y título. */
+function SectionHeader({
+  icon,
+  title,
+  badge,
+  styles,
+  colors,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  title: string;
+  badge?: string;
+  styles: Estilos;
+  colors: Palette;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Ionicons name={icon} size={16} color={colors.tabActive} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {badge ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badge}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export default function PatientForm({ onAddPatient }: Props) {
   const navigation = useNavigation();
   const r = useResponsive();
@@ -75,6 +131,10 @@ export default function PatientForm({ onAddPatient }: Props) {
   const [frecuenciaCardiaca, setFrecuenciaCardiaca] = useState("");
   const [sugerenciaAplicada, setSugerenciaAplicada] = useState(false);
 
+  // Los mensajes de "campo obligatorio" solo se muestran una vez que la usuaria
+  // intenta registrar: asi el formulario recien abierto no aparece lleno de rojo.
+  const [intentoEnviar, setIntentoEnviar] = useState(false);
+
   // errores en vivo
   const nombreError = useMemo(
     () => (nombre.trim().length === 0 ? "El nombre es obligatorio." : ""),
@@ -85,9 +145,14 @@ export default function PatientForm({ onAddPatient }: Props) {
     [sintomas]
   );
   const fechaError = useMemo(() => {
-    if (!fechaNacimiento.trim()) return "";
+    if (!fechaNacimiento.trim()) return "La fecha de nacimiento es obligatoria.";
     return /^\d{2}\/\d{2}\/\d{4}$/.test(fechaNacimiento) ? "" : "Usa DD/MM/AAAA.";
   }, [fechaNacimiento]);
+
+  // Version "visible" de cada error: se activa tras el primer intento de envio.
+  const verNombreError = intentoEnviar && !!nombreError;
+  const verSintomasError = intentoEnviar && !!sintomasError;
+  const verFechaError = intentoEnviar && !!fechaError;
 
   const sintomasCount = `${sintomas.length}/${MAX_SINTOMAS}`;
 
@@ -135,6 +200,8 @@ export default function PatientForm({ onAddPatient }: Props) {
   };
 
   const handleSubmit = async () => {
+    setIntentoEnviar(true);
+
     // validaciones
     if (!isNonEmpty(nombre) || !isNonEmpty(sintomas)) {
       showAlert("Validación", "El nombre y los síntomas son obligatorios.");
@@ -144,7 +211,11 @@ export default function PatientForm({ onAddPatient }: Props) {
       showAlert("Validación", "La urgencia debe ser 1, 2 o 3.");
       return;
     }
-    if (fechaNacimiento && !/^\d{2}\/\d{2}\/\d{4}$/.test(fechaNacimiento)) {
+    if (!isNonEmpty(fechaNacimiento)) {
+      showAlert("Validación", "La fecha de nacimiento es obligatoria.");
+      return;
+    }
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(fechaNacimiento)) {
       showAlert("Validación", "Usa formato de fecha DD/MM/AAAA.");
       return;
     }
@@ -190,6 +261,7 @@ export default function PatientForm({ onAddPatient }: Props) {
     setTemperatura("");
     setFrecuenciaCardiaca("");
     setSugerenciaAplicada(false);
+    setIntentoEnviar(false);
 
     // navegar
     showAlert("Éxito", "Paciente registrado en la lista de espera.", [
@@ -202,100 +274,102 @@ export default function PatientForm({ onAddPatient }: Props) {
     ]);
   };
 
+  const sugAplicada = !!prediccion && sugerenciaAplicada && urgencia === prediccion.urgencia;
+
   return (
     <ResponsiveScreen scroll avoidKeyboard maxWidth={r.pick({ xs: 9999, md: 720, lg: 880 })}>
-        {/* Encabezado bonito */}
-        <View style={styles.headerCard} accessible accessibilityRole="summary">
-          <Ionicons name="medkit-outline" size={r.isWide ? 30 : 26} color={colors.tabActive} />
-          <View style={{ marginLeft: 10, flexShrink: 1 }}>
-            <Text style={[styles.headerTitle, { fontSize: r.font.title }]}>Registro de Paciente</Text>
-            <Text style={[styles.headerSub, { fontSize: r.font.small }]}>
-              Completa la información para encolar por prioridad
-            </Text>
-          </View>
+      {/* Encabezado */}
+      <View style={styles.headerCard} accessible accessibilityRole="summary">
+        <View style={styles.headerIcon}>
+          <Ionicons name="medkit" size={r.isWide ? 24 : 20} color="#fff" />
         </View>
+        <View style={{ marginLeft: 12, flexShrink: 1 }}>
+          <Text style={[styles.headerTitle, { fontSize: r.font.title }]}>Registro de paciente</Text>
+          <Text style={[styles.headerSub, { fontSize: r.font.small }]}>
+            Completa la información para encolar por prioridad
+          </Text>
+        </View>
+      </View>
 
-        {/* Nombre y fecha: lado a lado en pantallas anchas */}
+      {/* --- Datos del paciente --- */}
+      <View style={styles.card}>
+        <SectionHeader icon="person-outline" title="Datos del paciente" styles={styles} colors={colors} />
+
         <View style={styles.rowFields}>
-          {/* Campo: Nombre */}
+          {/* Nombre */}
           <View style={[styles.field, halfField]}>
-            <Text style={styles.label}>Nombre completo*</Text>
+            <Text style={styles.label}>Nombre completo *</Text>
             <TextInput
               placeholder="Ej. María Fernanda López"
+              placeholderTextColor={colors.textMuted}
               value={nombre}
               onChangeText={setNombre}
-              style={[styles.input, nombreError ? styles.inputError : null]}
+              style={[styles.input, verNombreError && styles.inputError]}
               returnKeyType="next"
               accessibilityLabel="Nombre completo"
             />
-            <View style={styles.helpRow}>
-              <Ionicons
-                name={nombreError ? "alert-circle" : "information-circle-outline"}
-                size={14}
-                color={nombreError ? colors.danger : colors.textMuted}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.help, nombreError ? styles.helpError : null]}>
-                {nombreError || "Nombre y apellidos del paciente."}
-              </Text>
-            </View>
+            <FieldHint
+              error={verNombreError ? nombreError : ""}
+              hint="Nombre y apellidos del paciente."
+              styles={styles}
+              colors={colors}
+            />
           </View>
 
-          {/* Campo: Fecha de nacimiento (tres desplegables) */}
+          {/* Fecha de nacimiento */}
           <View style={[styles.field, halfField]}>
-            <Text style={styles.label}>Fecha de nacimiento</Text>
+            <Text style={styles.label}>Fecha de nacimiento *</Text>
             <DateField value={fechaNacimiento} onChange={setFechaNacimiento} />
-            <View style={styles.helpRow}>
-              <Ionicons
-                name={fechaNacimiento ? "checkmark-circle-outline" : "calendar-outline"}
-                size={14}
-                color={fechaNacimiento ? colors.priority.p3 : colors.textMuted}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={styles.help}>
-                {fechaNacimiento
+            <FieldHint
+              error={verFechaError ? fechaError : ""}
+              ok={!!fechaNacimiento}
+              hint={
+                fechaNacimiento
                   ? `${fechaNacimiento}${edadEstimadaTexto}`
-                  : "Elige día, mes y año."}
-              </Text>
-            </View>
+                  : "Elige día, mes y año."
+              }
+              styles={styles}
+              colors={colors}
+            />
           </View>
         </View>
 
-        {/* Campo: Síntomas */}
+        {/* Síntomas */}
         <View style={styles.field}>
-          <Text style={styles.label}>Síntomas*</Text>
+          <Text style={styles.label}>Síntomas *</Text>
           <TextInput
             placeholder="Describe los síntomas principales…"
+            placeholderTextColor={colors.textMuted}
             value={sintomas}
             onChangeText={(t) => setSintomas(t.slice(0, MAX_SINTOMAS))}
-            style={[styles.input, styles.textArea, sintomasError ? styles.inputError : null]}
+            style={[styles.input, styles.textArea, verSintomasError && styles.inputError]}
             multiline
             accessibilityLabel="Síntomas del paciente"
           />
           <View style={styles.helpRowBetween}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Ionicons
-                name={sintomasError ? "alert-circle" : "create-outline"}
-                size={14}
-                color={sintomasError ? colors.danger : colors.textMuted}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.help, sintomasError ? styles.helpError : null]}>
-                {sintomasError || "Máximo 240 caracteres."}
-              </Text>
-            </View>
+            <FieldHint
+              error={verSintomasError ? sintomasError : ""}
+              hint={`Máximo ${MAX_SINTOMAS} caracteres.`}
+              styles={styles}
+              colors={colors}
+            />
             <Text style={styles.counter}>{sintomasCount}</Text>
           </View>
         </View>
+      </View>
 
-        {/* --- Sección: signos clínicos para la predicción de IA --- */}
-        <View style={styles.aiSectionHeader}>
-          <Ionicons name="sparkles-outline" size={16} color={colors.tabActive} />
-          <Text style={styles.aiSectionTitle}>Signos para la prioridad sugerida (opcional)</Text>
-        </View>
-        <Text style={styles.help}>
-          Completa estos datos para que SmartTriage te sugiera una prioridad basada en el
-          modelo de Ciencia de Datos. Es solo una recomendación: tú decides la urgencia final.
+      {/* --- Signos clínicos para la prioridad sugerida --- */}
+      <View style={styles.card}>
+        <SectionHeader
+          icon="sparkles-outline"
+          title="Signos para la prioridad sugerida"
+          badge="Opcional"
+          styles={styles}
+          colors={colors}
+        />
+        <Text style={styles.sectionHint}>
+          SmartTriage usa estos datos para sugerir una prioridad con el modelo de Ciencia de
+          Datos. Es solo una recomendación: tú decides la urgencia final.
         </Text>
 
         {/* Síntoma principal */}
@@ -307,7 +381,7 @@ export default function PatientForm({ onAddPatient }: Props) {
               return (
                 <Pressable
                   key={s.value}
-                  onPress={() => setSintomaPrincipal(s.value)}
+                  onPress={() => setSintomaPrincipal(active ? null : s.value)}
                   style={[styles.chipSmall, active && styles.chipSmallActive]}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
@@ -331,12 +405,12 @@ export default function PatientForm({ onAddPatient }: Props) {
               return (
                 <Pressable
                   key={n}
-                  onPress={() => setNivelDolor(n as 1 | 2 | 3)}
-                  style={[styles.chip, active && { backgroundColor: colors.tabActive, borderColor: colors.tabActive }]}
+                  onPress={() => setNivelDolor(active ? null : (n as 1 | 2 | 3))}
+                  style={[styles.chip, active && styles.chipActive]}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
                 >
-                  <Text style={[styles.chipText, active && { color: "#fff" }]}>{texto}</Text>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{texto}</Text>
                 </Pressable>
               );
             })}
@@ -346,25 +420,31 @@ export default function PatientForm({ onAddPatient }: Props) {
         {/* Dificultad respiratoria */}
         <View style={[styles.field, styles.switchRow]}>
           <Text style={styles.label}>¿Dificultad respiratoria?</Text>
-          <Switch value={dificultadRespiratoria} onValueChange={setDificultadRespiratoria} />
+          <Switch
+            value={dificultadRespiratoria}
+            onValueChange={setDificultadRespiratoria}
+            trackColor={{ true: colors.tabActive, false: colors.border }}
+          />
         </View>
 
         {/* Temperatura y frecuencia cardiaca */}
         <View style={styles.rowFields}>
-          <View style={[styles.field, { flexGrow: 1, flexShrink: 1, flexBasis: 150 }]}>
+          <View style={[styles.field, styles.halfMin]}>
             <Text style={styles.label}>Temperatura (°C)</Text>
             <TextInput
               placeholder="Ej. 37.5"
+              placeholderTextColor={colors.textMuted}
               value={temperatura}
               onChangeText={setTemperatura}
               keyboardType="decimal-pad"
               style={styles.input}
             />
           </View>
-          <View style={[styles.field, { flexGrow: 1, flexShrink: 1, flexBasis: 150 }]}>
+          <View style={[styles.field, styles.halfMin]}>
             <Text style={styles.label}>Frec. cardíaca (lpm)</Text>
             <TextInput
               placeholder="Ej. 90"
+              placeholderTextColor={colors.textMuted}
               value={frecuenciaCardiaca}
               onChangeText={setFrecuenciaCardiaca}
               keyboardType="number-pad"
@@ -376,66 +456,84 @@ export default function PatientForm({ onAddPatient }: Props) {
         {/* Panel de sugerencia */}
         {prediccion && (
           <View style={[styles.aiCard, { borderColor: prioridadColor(prediccion.urgencia, colors) }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+            <View style={styles.aiCardHead}>
               <Ionicons name="sparkles" size={16} color={prioridadColor(prediccion.urgencia, colors)} />
               <Text style={[styles.aiCardTitle, { color: prioridadColor(prediccion.urgencia, colors) }]}>
-                {" "}Prioridad sugerida: {prediccion.urgencia === 1 ? "Alta" : prediccion.urgencia === 2 ? "Media" : "Baja"}
+                Prioridad sugerida:{" "}
+                {prediccion.urgencia === 1 ? "Alta" : prediccion.urgencia === 2 ? "Media" : "Baja"}
               </Text>
             </View>
             <Text style={styles.help}>
               Confianza aproximada: {Math.round(prediccion.confianza * 100)}% ·{" "}
               {prediccion.explicacion.join(", ")}
             </Text>
-            <Pressable onPress={usarSugerencia} style={styles.useSuggestionBtn}>
-              <Text style={styles.useSuggestionText}>
-                {sugerenciaAplicada && urgencia === prediccion.urgencia ? "Sugerencia aplicada ✓" : "Usar esta sugerencia"}
+            <Pressable
+              onPress={usarSugerencia}
+              style={[styles.useSuggestionBtn, sugAplicada && styles.useSuggestionBtnDone]}
+            >
+              <Ionicons
+                name={sugAplicada ? "checkmark" : "arrow-down"}
+                size={13}
+                color={sugAplicada ? "#fff" : colors.text}
+                style={{ marginRight: 5 }}
+              />
+              <Text style={[styles.useSuggestionText, sugAplicada && { color: "#fff" }]}>
+                {sugAplicada ? "Sugerencia aplicada" : "Usar esta sugerencia"}
               </Text>
             </Pressable>
           </View>
         )}
+      </View>
 
-        {/* Urgencia (chips) */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Nivel de urgencia (decisión final)</Text>
-          <View style={styles.chipsRow} accessible accessibilityRole="radiogroup">
-            {[1, 2, 3].map((p) => {
-              const active = urgencia === p;
-              return (
-                <Pressable
-                  key={p}
-                  onPress={() => {
-                    setUrgencia(p as 1 | 2 | 3);
-                    setSugerenciaAplicada(false);
-                  }}
-                  style={[
-                    styles.chip,
-                    { borderColor: prioridadColor(p as 1 | 2 | 3, colors) },
-                    active && { backgroundColor: prioridadColor(p as 1 | 2 | 3, colors) },
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={`Prioridad ${p}`}
-                >
-                  <Ionicons
-                    name={p === 1 ? "alert" : p === 2 ? "warning-outline" : "leaf-outline"}
-                    size={14}
-                    color={active ? "#fff" : prioridadColor(p as 1 | 2 | 3, colors)}
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text style={[styles.chipText, active && { color: "#fff" }]}>
-                    {p === 1 ? "Alta (1)" : p === 2 ? "Media (2)" : "Baja (3)"}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.helpRow}>
-            <Ionicons name="speedometer-outline" size={14} color={colors.textMuted} style={{ marginRight: 4 }} />
-            <Text style={styles.help}>La cola prioriza Alta &gt; Media &gt; Baja y, si empatan, el más antiguo.</Text>
-          </View>
+      {/* --- Decisión final --- */}
+      <View style={[styles.card, styles.cardFinal]}>
+        <SectionHeader icon="flag-outline" title="Decisión final" styles={styles} colors={colors} />
+        <Text style={styles.label}>Nivel de urgencia</Text>
+        <View style={styles.chipsRow} accessible accessibilityRole="radiogroup">
+          {[1, 2, 3].map((p) => {
+            const active = urgencia === p;
+            const color = prioridadColor(p as 1 | 2 | 3, colors);
+            return (
+              <Pressable
+                key={p}
+                onPress={() => {
+                  setUrgencia(p as 1 | 2 | 3);
+                  setSugerenciaAplicada(false);
+                }}
+                style={[
+                  styles.chip,
+                  { borderColor: color },
+                  active && { backgroundColor: color, borderColor: color },
+                ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Prioridad ${p}`}
+              >
+                <Ionicons
+                  name={p === 1 ? "alert" : p === 2 ? "warning-outline" : "leaf-outline"}
+                  size={14}
+                  color={active ? "#fff" : color}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {p === 1 ? "Alta (1)" : p === 2 ? "Media (2)" : "Baja (3)"}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={styles.helpRow}>
+          <Ionicons
+            name="speedometer-outline"
+            size={14}
+            color={colors.textMuted}
+            style={{ marginRight: 4 }}
+          />
+          <Text style={styles.help}>
+            La cola prioriza Alta &gt; Media &gt; Baja y, si empatan, el más antiguo.
+          </Text>
         </View>
 
-        {/* Botón submit: ancho completo en móvil, ajustado al texto en escritorio */}
         <Pressable
           onPress={handleSubmit}
           style={[styles.primaryBtn, r.isWide && styles.primaryBtnInline]}
@@ -444,123 +542,182 @@ export default function PatientForm({ onAddPatient }: Props) {
           <Ionicons name="save-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
           <Text style={styles.primaryBtnText}>Registrar paciente</Text>
         </Pressable>
+      </View>
     </ResponsiveScreen>
   );
 }
 
 const crearEstilos = (colors: Palette) =>
   StyleSheet.create({
-  headerCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.card,
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 12,
-  },
-  headerTitle: { fontWeight: "800", color: colors.text },
-  headerSub: { color: colors.textMuted, marginTop: 2 },
+    // ---- Encabezado ----
+    headerCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.card,
+      padding: 14,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 14,
+    },
+    headerIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.tabActive,
+    },
+    headerTitle: { fontWeight: "800", color: colors.text },
+    headerSub: { color: colors.textMuted, marginTop: 2 },
 
-  field: { marginBottom: 12 },
-  label: { fontWeight: "700", marginBottom: 6, color: colors.text },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: colors.card,
-    color: colors.text,
-  },
-  textArea: { minHeight: 96, textAlignVertical: "top" },
-  inputError: { borderColor: colors.danger },
+    // ---- Tarjeta de sección ----
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+      marginBottom: 14,
+    },
+    cardFinal: { borderColor: colors.tabActive, borderWidth: 1.5 },
 
-  helpRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
-  helpRowBetween: {
-    marginTop: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  help: { color: colors.textMuted, fontSize: 12 },
-  helpError: { color: colors.danger },
-  counter: { color: colors.textMuted, fontSize: 12, fontVariant: ["tabular-nums"] },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 12,
+    },
+    sectionTitle: { fontWeight: "800", color: colors.text, fontSize: 15 },
+    sectionHint: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 17,
+      marginTop: -4,
+      marginBottom: 12,
+    },
+    badge: {
+      marginLeft: "auto",
+      backgroundColor: colors.surface,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    badgeText: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+    },
 
-  // Los chips se envuelven en pantallas estrechas en lugar de desbordarse.
-  chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  wrapChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-  },
-  chipText: { fontWeight: "700", color: colors.text },
+    // ---- Campos ----
+    field: { marginBottom: 12 },
+    halfMin: { flexGrow: 1, flexShrink: 1, flexBasis: 150 },
+    label: { fontWeight: "700", marginBottom: 6, color: colors.text, fontSize: 13 },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: colors.input,
+      color: colors.text,
+      fontSize: 14,
+    },
+    textArea: { minHeight: 96, textAlignVertical: "top" },
+    inputError: { borderColor: colors.danger, borderWidth: 1.5 },
 
-  chipSmall: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  chipSmallActive: { backgroundColor: colors.tabActive, borderColor: colors.tabActive },
-  chipSmallText: { fontSize: 12, fontWeight: "600", color: colors.text },
-  chipSmallTextActive: { color: "#fff" },
+    helpRow: { flexDirection: "row", alignItems: "center", marginTop: 6, flexShrink: 1 },
+    helpRowBetween: {
+      marginTop: 6,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    help: { color: colors.textMuted, fontSize: 12, flexShrink: 1 },
+    helpError: { color: colors.danger },
+    counter: { color: colors.textMuted, fontSize: 12, fontVariant: ["tabular-nums"] },
 
-  aiSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  aiSectionTitle: { fontWeight: "800", color: colors.text, marginLeft: 6 },
+    // ---- Chips ----
+    chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    wrapChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    chip: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 999,
+      borderWidth: 1.5,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    chipActive: { backgroundColor: colors.tabActive, borderColor: colors.tabActive },
+    chipText: { fontWeight: "700", color: colors.text, fontSize: 13 },
+    chipTextActive: { color: "#fff" },
 
-  switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  // Fila de campos que se convierte en columna cuando no hay ancho suficiente.
-  rowFields: { flexDirection: "row", flexWrap: "wrap", columnGap: 12 },
+    chipSmall: {
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderRadius: 999,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    chipSmallActive: { backgroundColor: colors.tabActive, borderColor: colors.tabActive },
+    chipSmallText: { fontSize: 12, fontWeight: "600", color: colors.text },
+    chipSmallTextActive: { color: "#fff" },
 
-  aiCard: {
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
-  },
-  aiCardTitle: { fontWeight: "800", fontSize: 14 },
-  useSuggestionBtn: {
-    marginTop: 8,
-    alignSelf: "flex-start",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  useSuggestionText: { fontWeight: "700", color: colors.text, fontSize: 12 },
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    // Fila de campos que se convierte en columna cuando no hay ancho suficiente.
+    rowFields: { flexDirection: "row", flexWrap: "wrap", columnGap: 12 },
 
-  primaryBtn: {
-    marginTop: 6,
-    backgroundColor: colors.tabActive,
-    paddingVertical: 12,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    shadowColor: "#000",
-    shadowOpacity: colors.shadowOpacity,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  primaryBtnInline: { alignSelf: "flex-start", paddingHorizontal: 24 },
-  primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
-});
+    // ---- Tarjeta de sugerencia ----
+    aiCard: {
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderRadius: 14,
+      padding: 12,
+      marginTop: 4,
+    },
+    aiCardHead: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
+    aiCardTitle: { fontWeight: "800", fontSize: 14 },
+    useSuggestionBtn: {
+      marginTop: 10,
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    useSuggestionBtnDone: { backgroundColor: colors.priority.p3, borderColor: colors.priority.p3 },
+    useSuggestionText: { fontWeight: "700", color: colors.text, fontSize: 12 },
+
+    // ---- Botón principal ----
+    primaryBtn: {
+      marginTop: 14,
+      backgroundColor: colors.tabActive,
+      paddingVertical: 14,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+      shadowColor: "#000",
+      shadowOpacity: colors.shadowOpacity,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    primaryBtnInline: { alignSelf: "flex-start", paddingHorizontal: 28 },
+    primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  });
