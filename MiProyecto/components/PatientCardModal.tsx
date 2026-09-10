@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, View, Text, TextInput, StyleSheet, Pressable, Platform } from "react-native";
+import { Modal, View, Text, TextInput, StyleSheet, Pressable, Platform, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Patient } from "../models/Patient";
-import { COLORS } from "../theme/colors";
+import { Palette } from "../theme/colors";
+import { useTheme } from "../theme/ThemeContext";
+import { useResponsive } from "../theme/responsive";
 
 type Mode = "queue" | "history";
 
@@ -28,13 +30,16 @@ function maskDDMMYYYY(input: string) {
   return `${parts[0]}/${parts[1]}/${parts[2]}`;
 }
 
-function prioridadColor(p: 1 | 2 | 3) {
-  if (p === 1) return COLORS.priority.p1;
-  if (p === 2) return COLORS.priority.p2;
-  return COLORS.priority.p3;
+function prioridadColor(p: 1 | 2 | 3, colors: Palette) {
+  if (p === 1) return colors.priority.p1;
+  if (p === 2) return colors.priority.p2;
+  return colors.priority.p3;
 }
 
 export default function PatientCardModal({ visible, mode, patient, onClose, onSave, onDelete }: Props) {
+  const r = useResponsive();
+  const { colors } = useTheme();
+  const styles = useMemo(() => crearEstilos(colors), [colors]);
   const [nombre, setNombre] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [sintomas, setSintomas] = useState("");
@@ -53,17 +58,31 @@ export default function PatientCardModal({ visible, mode, patient, onClose, onSa
 
   if (!patient) return null;
 
+  // En móvil se comporta como hoja inferior; en pantallas anchas, como un
+  // diálogo centrado con ancho limitado.
+  const asDialog = r.isWide;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={asDialog ? "fade" : "slide"}
+      onRequestClose={onClose}
+    >
+      <View style={[styles.backdrop, asDialog ? styles.backdropCentered : styles.backdropBottom]}>
+        <View style={[styles.card, asDialog && styles.cardDialog]}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 4 }}
+          >
           <View style={styles.header}>
-            <Ionicons name="id-card-outline" size={22} color={COLORS.tabActive} />
+            <Ionicons name="id-card-outline" size={22} color={colors.tabActive} />
             <Text style={styles.title}>
               {mode === "queue" ? "Paciente en espera" : "Paciente atendido"}
             </Text>
             <Pressable onPress={onClose} hitSlop={10} style={{ marginLeft: "auto" }}>
-              <Ionicons name="close" size={22} color={COLORS.text} />
+              <Ionicons name="close" size={22} color={colors.text} />
             </Pressable>
           </View>
 
@@ -76,7 +95,7 @@ export default function PatientCardModal({ visible, mode, patient, onClose, onSa
             onChangeText={setNombre}
             placeholder="Nombre completo"
             style={styles.input}
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={colors.textMuted}
           />
 
           <Text style={styles.label}>Fecha nacimiento (DD/MM/AAAA)</Text>
@@ -86,7 +105,7 @@ export default function PatientCardModal({ visible, mode, patient, onClose, onSa
             placeholder="DD/MM/AAAA"
             keyboardType="number-pad"
             style={styles.input}
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={colors.textMuted}
           />
 
           <Text style={styles.label}>Síntomas*</Text>
@@ -96,21 +115,21 @@ export default function PatientCardModal({ visible, mode, patient, onClose, onSa
             placeholder="Síntomas…"
             style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
             multiline
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={colors.textMuted}
           />
 
           <Text style={styles.label}>Urgencia</Text>
           <View style={styles.chipsRow} accessible accessibilityRole="radiogroup">
             {[1, 2, 3].map((p) => {
               const active = urgencia === p;
-              const color = prioridadColor(p as 1 | 2 | 3);
+              const color = prioridadColor(p as 1 | 2 | 3, colors);
               return (
                 <Pressable
                   key={p}
                   onPress={() => setUrgencia(p as 1 | 2 | 3)}
                   style={[
                     styles.chip,
-                    { borderColor: color, backgroundColor: active ? color : "#fff" },
+                    { borderColor: color, backgroundColor: active ? color : colors.input },
                   ]}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
@@ -143,7 +162,7 @@ export default function PatientCardModal({ visible, mode, patient, onClose, onSa
             <View style={{ flex: 1 }} />
 
             <Pressable onPress={onClose} style={[styles.btn, styles.btnGhost]}>
-              <Text style={[styles.btnText, { color: COLORS.text }]}>Cancelar</Text>
+              <Text style={[styles.btnText, { color: colors.text }]}>Cancelar</Text>
             </Pressable>
 
             <Pressable
@@ -164,44 +183,54 @@ export default function PatientCardModal({ visible, mode, patient, onClose, onSa
               <Text style={styles.btnText}>Guardar</Text>
             </Pressable>
           </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.25)", justifyContent: "flex-end",
-  },
+const crearEstilos = (colors: Palette) =>
+  StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.25)" },
+  backdropBottom: { justifyContent: "flex-end" },
+  backdropCentered: { justifyContent: "center", alignItems: "center", padding: 24 },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingHorizontal: 14, paddingTop: 12, paddingBottom: Platform.OS === "ios" ? 28 : 18,
-    borderWidth: 1, borderColor: COLORS.border,
+    borderWidth: 1, borderColor: colors.border,
+    maxHeight: "90%",
+  },
+  cardDialog: {
+    width: "100%",
+    maxWidth: 560,
+    borderRadius: 20,
+    paddingBottom: 18,
+    maxHeight: "85%",
   },
   header: { flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 8 },
-  title: { fontSize: 16, fontWeight: "800", color: COLORS.text },
-  label: { marginTop: 10, marginBottom: 6, fontWeight: "700", color: COLORS.text },
-  meta: { color: COLORS.textMuted },
+  title: { fontSize: 16, fontWeight: "800", color: colors.text },
+  label: { marginTop: 10, marginBottom: 6, fontWeight: "700", color: colors.text },
+  meta: { color: colors.textMuted },
   input: {
-    borderWidth: 1, borderColor: COLORS.border, borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#fff", color: COLORS.text,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.card, color: colors.text,
   },
-  chipsRow: { flexDirection: "row", gap: 8 },
+  chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     flexDirection: "row", alignItems: "center",
     paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1.5,
   },
-  chipText: { fontWeight: "700", color: COLORS.text },
+  chipText: { fontWeight: "700", color: colors.text },
 
-  actionsRow: { flexDirection: "row", alignItems: "center", marginTop: 14, gap: 10 },
+  actionsRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", marginTop: 14, gap: 10 },
   btn: {
     flexDirection: "row", alignItems: "center",
     paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12,
   },
-  btnDanger: { backgroundColor: "#ef4444" },
-  btnPrimary: { backgroundColor: COLORS.tabActive },
-  btnGhost: { backgroundColor: "#f8fafc", borderWidth: 1, borderColor: COLORS.border },
+  btnDanger: { backgroundColor: colors.danger },
+  btnPrimary: { backgroundColor: colors.tabActive },
+  btnGhost: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   btnText: { color: "#fff", fontWeight: "800" },
 });

@@ -1,8 +1,11 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Patient } from "../models/Patient";
 import { HistoryItem } from "./HistoryScreen";
-import { COLORS } from "../theme/colors";
+import { Palette } from "../theme/colors";
+import { useTheme } from "../theme/ThemeContext";
+import { useResponsive } from "../theme/responsive";
+import ResponsiveScreen from "../components/ResponsiveScreen";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = { queue: Patient[]; history: HistoryItem[] };
@@ -17,6 +20,12 @@ function fmtMs(ms: number) {
 }
 
 export default function StatsScreen({ queue, history }: Props) {
+  const r = useResponsive();
+  const { colors } = useTheme();
+  const styles = useMemo(() => crearEstilos(colors), [colors]);
+  // Ancho mínimo de cada tarjeta: por debajo de esto se apilan.
+  const cardMinWidth = r.pick({ xs: 260, md: 300, lg: 320 });
+
   const queueCounts = useMemo(() => {
     const c = { p1: 0, p2: 0, p3: 0 };
     for (const p of queue) {
@@ -69,12 +78,20 @@ export default function StatsScreen({ queue, history }: Props) {
     );
   };
 
+  // Cada tarjeta pide un ancho mínimo y crece para repartirse la fila; el
+  // propio flex-wrap decide cuántas caben, así que el número de columnas se
+  // ajusta solo a cualquier ancho de ventana.
+  // flexShrink explícito: en React Native el valor por defecto es 0, así que sin
+  // esto una tarjeta se desbordaría en pantallas más estrechas que su base.
+  const cardStyle = [styles.card, { flexGrow: 1, flexShrink: 1, flexBasis: cardMinWidth }];
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: COLORS.bg }} contentContainerStyle={{ paddingBottom: 16 }}>
+    <ResponsiveScreen scroll>
+      <View style={[styles.grid, { gap: r.gap }]}>
       {/* En espera */}
-      <View style={styles.card}>
+      <View style={cardStyle}>
         <View style={styles.cardHeader}>
-          <Ionicons name="people-outline" size={18} color={COLORS.tabActive} />
+          <Ionicons name="people-outline" size={18} color={colors.tabActive} />
           <Text style={styles.title}>En espera</Text>
         </View>
         <View style={styles.rowBetween}>
@@ -85,28 +102,28 @@ export default function StatsScreen({ queue, history }: Props) {
         <View style={styles.separator} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p1 }]}><Text style={styles.pillText}>Alta (1)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: colors.priority.p1 }]}><Text style={styles.pillText}>Alta (1)</Text></View>
           <Text style={styles.countText}>{queueCounts.p1}</Text>
         </View>
-        <Bar value={queueCounts.p1} max={maxCountQueue} color={COLORS.priority.p1} />
+        <Bar value={queueCounts.p1} max={maxCountQueue} color={colors.priority.p1} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p2 }]}><Text style={styles.pillText}>Media (2)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: colors.priority.p2 }]}><Text style={styles.pillText}>Media (2)</Text></View>
           <Text style={styles.countText}>{queueCounts.p2}</Text>
         </View>
-        <Bar value={queueCounts.p2} max={maxCountQueue} color={COLORS.priority.p2} />
+        <Bar value={queueCounts.p2} max={maxCountQueue} color={colors.priority.p2} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p3 }]}><Text style={styles.pillText}>Baja (3)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: colors.priority.p3 }]}><Text style={styles.pillText}>Baja (3)</Text></View>
           <Text style={styles.countText}>{queueCounts.p3}</Text>
         </View>
-        <Bar value={queueCounts.p3} max={maxCountQueue} color={COLORS.priority.p3} />
+        <Bar value={queueCounts.p3} max={maxCountQueue} color={colors.priority.p3} />
       </View>
 
       {/* Atendidos */}
-      <View style={styles.card}>
+      <View style={cardStyle}>
         <View style={styles.cardHeader}>
-          <Ionicons name="time-outline" size={18} color={COLORS.tabActive} />
+          <Ionicons name="time-outline" size={18} color={colors.tabActive} />
           <Text style={styles.title}>Atendidos</Text>
         </View>
         <View style={styles.rowBetween}>
@@ -117,34 +134,34 @@ export default function StatsScreen({ queue, history }: Props) {
         <View style={styles.separator} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p1 }]}><Text style={styles.pillText}>Alta (1)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: colors.priority.p1 }]}><Text style={styles.pillText}>Alta (1)</Text></View>
           <Text style={styles.countText}>{histCounts.p1}</Text>
         </View>
-        <Bar value={histCounts.p1} max={maxCountHist} color={COLORS.priority.p1} />
+        <Bar value={histCounts.p1} max={maxCountHist} color={colors.priority.p1} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p2 }]}><Text style={styles.pillText}>Media (2)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: colors.priority.p2 }]}><Text style={styles.pillText}>Media (2)</Text></View>
           <Text style={styles.countText}>{histCounts.p2}</Text>
         </View>
-        <Bar value={histCounts.p2} max={maxCountHist} color={COLORS.priority.p2} />
+        <Bar value={histCounts.p2} max={maxCountHist} color={colors.priority.p2} />
 
         <View style={styles.metricRow}>
-          <View style={[styles.pillLeft, { backgroundColor: COLORS.priority.p3 }]}><Text style={styles.pillText}>Baja (3)</Text></View>
+          <View style={[styles.pillLeft, { backgroundColor: colors.priority.p3 }]}><Text style={styles.pillText}>Baja (3)</Text></View>
           <Text style={styles.countText}>{histCounts.p3}</Text>
         </View>
-        <Bar value={histCounts.p3} max={maxCountHist} color={COLORS.priority.p3} />
+        <Bar value={histCounts.p3} max={maxCountHist} color={colors.priority.p3} />
       </View>
 
       {/* Tiempos promedio */}
-      <View style={styles.card}>
+      <View style={cardStyle}>
         <View style={styles.cardHeader}>
-          <Ionicons name="stopwatch-outline" size={18} color={COLORS.tabActive} />
+          <Ionicons name="stopwatch-outline" size={18} color={colors.tabActive} />
           <Text style={styles.title}>Tiempo promedio de espera</Text>
         </View>
 
         <View style={styles.rowBetween}>
           <Text style={styles.metricLabel}>Global</Text>
-          <Text style={[styles.metricValue, { color: COLORS.tabActive }]}>{fmtMs(avgWaitAll)}</Text>
+          <Text style={[styles.metricValue, { color: colors.tabActive }]}>{fmtMs(avgWaitAll)}</Text>
         </View>
 
         <View style={styles.separator} />
@@ -167,7 +184,8 @@ export default function StatsScreen({ queue, history }: Props) {
           Si no hay queuedAt (pacientes antiguos), se considera 0m.
         </Text>
       </View>
-    </ScrollView>
+      </View>
+    </ResponsiveScreen>
   );
 }
 
@@ -181,32 +199,36 @@ function queueCountsMax(queue: Patient[]) {
   return Math.max(p1, p2, p3);
 }
 
-const styles = StyleSheet.create({
+const crearEstilos = (colors: Palette) =>
+  StyleSheet.create({
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+  },
   card: {
     padding: 14,
-    marginHorizontal: 10,
-    marginVertical: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#EAECF0",
+    borderColor: colors.border,
     shadowColor: "#000",
-    shadowOpacity: 0.06,
+    shadowOpacity: colors.shadowOpacity,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
     elevation: 2,
   },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 8 },
-  title: { fontWeight: "800", fontSize: 16, color: "#0F172A" },
+  title: { fontWeight: "800", fontSize: 16, color: colors.text },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 2 },
-  metricLabel: { color: "#667085", fontSize: 14 },
-  metricValue: { color: "#0F172A", fontSize: 14, fontWeight: "700" },
-  separator: { height: 1, backgroundColor: "#EAECF0", marginVertical: 10 },
+  metricLabel: { color: colors.textMuted, fontSize: 14 },
+  metricValue: { color: colors.text, fontSize: 14, fontWeight: "700" },
+  separator: { height: 1, backgroundColor: colors.border, marginVertical: 10 },
   metricRow: { marginTop: 6, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   pillLeft: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   pillText: { color: "#FFFFFF", fontWeight: "700" },
-  countText: { fontWeight: "800", color: "#0F172A" },
-  barTrack: { height: 8, backgroundColor: "#F1F5F9", borderRadius: 999, overflow: "hidden", marginTop: 6 },
+  countText: { fontWeight: "800", color: colors.text },
+  barTrack: { height: 8, backgroundColor: colors.surface, borderRadius: 999, overflow: "hidden", marginTop: 6 },
   barFill: { height: 8, borderRadius: 999 },
-  note: { color: "#667085", fontSize: 12, marginTop: 12 },
+  note: { color: colors.textMuted, fontSize: 12, marginTop: 12 },
 });

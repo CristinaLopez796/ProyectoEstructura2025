@@ -1,0 +1,8 @@
+{
+  // Usa el TypeScript del proyecto (5.8.3) en vez del que trae VS Code.
+  // expo/tsconfig.base necesita "module": "preserve" (TS 5.4+) y
+  // "customConditions" (TS 5.0+); con una version anterior el editor marca
+  // error en la linea "extends" de MiProyecto/tsconfig.json.
+  "typescript.tsdk": "MiProyecto/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
