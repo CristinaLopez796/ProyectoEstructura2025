@@ -10,6 +10,15 @@ import { Ionicons } from "@expo/vector-icons";
 
 type Props = { queue: Patient[]; history: HistoryItem[] };
 
+/** Mediana de una lista de tiempos de espera (ms). Menos sensible que el
+ * promedio a un puñado de esperas extremas. */
+function median(valores: number[]): number {
+  if (!valores.length) return 0;
+  const s = [...valores].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
 function fmtMs(ms: number) {
   if (!isFinite(ms) || ms <= 0) return "0m";
   const mins = Math.round(ms / 60000);
@@ -36,26 +45,56 @@ export default function StatsScreen({ queue, history }: Props) {
     return c;
   }, [queue]);
 
-  const { histCounts, avgWaitAll, avgByPriority, maxCountQueue, maxCountHist } = useMemo(() => {
+  const {
+    histCounts,
+    avgWaitAll,
+    medianWaitAll,
+    avgByPriority,
+    sinDatoEspera,
+    maxCountQueue,
+    maxCountHist,
+  } = useMemo(() => {
+    // `counts` = cuantos se atendieron por prioridad, cuenta TODOS los
+    // registros del historial (se muestra en la tarjeta "Atendidos").
     const counts = { p1: 0, p2: 0, p3: 0 };
+
+    // El promedio de espera es un calculo aparte: solo debe entrar la gente
+    // de la que sí se sabe cuanto espero. Antes, a quien no tenia waitedMs
+    // (pacientes antiguos sin queuedAt) se le contaba una espera de 0 minutos
+    // -- eso metia un 0 real en la suma Y sumaba 1 al conteo, sesgando el
+    // promedio hacia abajo. La correccion es la misma idea que ya usa
+    // HistoryScreen.tsx para la "espera media" de cada mes: excluir del
+    // promedio a quien no tiene dato, no inventarle un cero.
     const sumWait = { p1: 0, p2: 0, p3: 0 };
+    const conDato = { p1: 0, p2: 0, p3: 0 };
+    const waitsAll: number[] = [];
     let totalWait = 0;
-    let totalN = 0;
+    let totalConDato = 0;
+    let sinDato = 0;
 
     for (const h of history) {
       const pr = h.paciente.urgencia;
-      const waited = h.waitedMs ?? 0;
-      if (pr === 1) { counts.p1++; sumWait.p1 += waited; }
-      else if (pr === 2) { counts.p2++; sumWait.p2 += waited; }
-      else { counts.p3++; sumWait.p3 += waited; }
-      totalWait += waited;
-      totalN++;
+      if (pr === 1) counts.p1++;
+      else if (pr === 2) counts.p2++;
+      else counts.p3++;
+
+      const waited = h.waitedMs;
+      if (typeof waited === "number" && isFinite(waited) && waited >= 0) {
+        if (pr === 1) { sumWait.p1 += waited; conDato.p1++; }
+        else if (pr === 2) { sumWait.p2 += waited; conDato.p2++; }
+        else { sumWait.p3 += waited; conDato.p3++; }
+        totalWait += waited;
+        totalConDato++;
+        waitsAll.push(waited);
+      } else {
+        sinDato++;
+      }
     }
 
-    const avgAll = totalN ? totalWait / totalN : 0;
-    const avgP1 = counts.p1 ? sumWait.p1 / counts.p1 : 0;
-    const avgP2 = counts.p2 ? sumWait.p2 / counts.p2 : 0;
-    const avgP3 = counts.p3 ? sumWait.p3 / counts.p3 : 0;
+    const avgAll = totalConDato ? totalWait / totalConDato : 0;
+    const avgP1 = conDato.p1 ? sumWait.p1 / conDato.p1 : 0;
+    const avgP2 = conDato.p2 ? sumWait.p2 / conDato.p2 : 0;
+    const avgP3 = conDato.p3 ? sumWait.p3 / conDato.p3 : 0;
 
     const maxQ = Math.max(queueCountsMax(queue), 1);
     const maxH = Math.max(counts.p1, counts.p2, counts.p3, 1);
@@ -63,7 +102,9 @@ export default function StatsScreen({ queue, history }: Props) {
     return {
       histCounts: counts,
       avgWaitAll: avgAll,
+      medianWaitAll: median(waitsAll),
       avgByPriority: { p1: avgP1, p2: avgP2, p3: avgP3 },
+      sinDatoEspera: sinDato,
       maxCountQueue: maxQ,
       maxCountHist: maxH,
     };
@@ -160,8 +201,12 @@ export default function StatsScreen({ queue, history }: Props) {
         </View>
 
         <View style={styles.rowBetween}>
-          <Text style={styles.metricLabel}>Global</Text>
+          <Text style={styles.metricLabel}>Global (promedio)</Text>
           <Text style={[styles.metricValue, { color: colors.tabActive }]}>{fmtMs(avgWaitAll)}</Text>
+        </View>
+        <View style={styles.rowBetween}>
+          <Text style={styles.metricLabel}>Global (mediana)</Text>
+          <Text style={styles.metricValue}>{fmtMs(medianWaitAll)}</Text>
         </View>
 
         <View style={styles.separator} />
@@ -181,7 +226,11 @@ export default function StatsScreen({ queue, history }: Props) {
 
         <Text style={styles.note}>
           Nota: la espera se calcula desde el registro (queuedAt) hasta la atención.
-          Si no hay queuedAt (pacientes antiguos), se considera 0m.
+          {sinDatoEspera > 0
+            ? ` ${sinDatoEspera} paciente${sinDatoEspera === 1 ? "" : "s"} sin ese dato ` +
+              `(registros antiguos sin queuedAt) se excluye${sinDatoEspera === 1 ? "" : "n"} ` +
+              `del promedio y la mediana, en vez de contarse como espera 0.`
+            : " Todos los registros del historial tienen dato de espera."}
         </Text>
       </View>
       </View>

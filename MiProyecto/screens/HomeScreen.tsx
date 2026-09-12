@@ -143,8 +143,12 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
 
     const paciente: Patient = next.value;
     const now = Date.now();
-    const queuedAt = paciente.queuedAt ?? now;
-    const waitedMs = Math.max(0, now - queuedAt);
+    // Si no hay queuedAt (paciente antiguo, de antes de que ese campo
+    // existiera) NO se puede saber cuanto espero: se deja waitedMs sin definir
+    // en vez de inventar un 0, que en las estadisticas se leeria como "espera
+    // instantanea" y sesgaria el promedio hacia abajo. Ver StatsScreen.tsx.
+    const queuedAt = paciente.queuedAt;
+    const waitedMs = typeof queuedAt === "number" ? Math.max(0, now - queuedAt) : undefined;
     const item: HistoryItem = { paciente, atendidoEn: now, waitedMs };
 
     try {
