@@ -13,6 +13,7 @@ import { supabase } from '../config/supabaseClient';
 import { Patient } from '../models/Patient';
 import { HistoryItem } from '../screens/HistoryScreen';
 import { SintomaPrincipal } from './priorityPrediction';
+import { edadDesdeFecha } from './datetime';
 
 // ---------------------------------------------------------------
 // Traduccion entre la fila de PostgreSQL y el modelo de la app
@@ -21,6 +22,7 @@ import { SintomaPrincipal } from './priorityPrediction';
 type PatientRow = {
   id: string;
   nombre: string;
+  numero_identidad: string | null;
   fecha_nacimiento: string | null;
   sintomas: string;
   expediente: string;
@@ -47,6 +49,7 @@ function rowToPatient(row: PatientRow): Patient {
   return {
     id: row.id,
     nombre: row.nombre,
+    numeroIdentidad: row.numero_identidad ?? undefined,
     fechaNacimiento: row.fecha_nacimiento ?? '',
     sintomas: row.sintomas,
     expediente: row.expediente,
@@ -67,6 +70,7 @@ function patientToRow(p: Patient, userId: string) {
     id: p.id,
     user_id: userId,
     nombre: p.nombre,
+    numero_identidad: p.numeroIdentidad || null,
     fecha_nacimiento: p.fechaNacimiento || null,
     sintomas: p.sintomas,
     expediente: p.expediente,
@@ -136,12 +140,24 @@ type HistoryRow = {
   id: string;
   patient_id: string | null;
   patient_name: string;
+  numero_identidad: string | null;
   patient_birthday: string | null;
   symptoms: string | null;
   urgency: 1 | 2 | 3;
   expediente: string | null;
   attended_at: number | string;
   waited_ms: number | string | null;
+
+  // Columnas para el dataset de Ciencia de Datos.
+  edad: number | null;
+  sintoma_principal: SintomaPrincipal | null;
+  nivel_dolor: 1 | 2 | 3 | null;
+  dificultad_respiratoria: boolean | null;
+  temperatura: number | string | null;
+  frecuencia_cardiaca: number | null;
+  queued_at: number | string | null;
+  prediccion_urgencia: 1 | 2 | 3 | null;
+  prediccion_confianza: number | string | null;
 };
 
 function rowToHistory(row: HistoryRow): HistoryItem {
@@ -152,14 +168,38 @@ function rowToHistory(row: HistoryRow): HistoryItem {
     paciente: {
       id: row.patient_id ?? row.id,
       nombre: row.patient_name,
+      numeroIdentidad: row.numero_identidad ?? undefined,
       fechaNacimiento: row.patient_birthday ?? '',
       sintomas: row.symptoms ?? '',
       urgencia: row.urgency,
       expediente: row.expediente ?? '',
+      queuedAt: num(row.queued_at),
+      sintomaPrincipal: row.sintoma_principal ?? undefined,
+      nivelDolor: row.nivel_dolor ?? undefined,
+      dificultadRespiratoria: row.dificultad_respiratoria ?? undefined,
+      temperatura: num(row.temperatura),
+      frecuenciaCardiaca: row.frecuencia_cardiaca ?? undefined,
+      prediccionUrgencia: row.prediccion_urgencia ?? undefined,
+      prediccionConfianza: num(row.prediccion_confianza),
     },
     atendidoEn: num(row.attended_at) ?? 0,
     waitedMs: num(row.waited_ms),
   };
+}
+
+// Rangos que exigen los CHECK de appointment_history. Si un valor cae fuera,
+// PostgreSQL rechaza el insert entero y la atencion falla; por eso aqui se
+// manda null en vez de arriesgar el guardado completo por un signo vital mal
+// tecleado. El formulario ya valida estos mismos rangos al registrar.
+export const RANGO_TEMPERATURA = { min: 25, max: 45 };
+export const RANGO_FRECUENCIA = { min: 30, max: 250 };
+
+function dentroDeRango(
+  valor: number | undefined,
+  rango: { min: number; max: number }
+): number | null {
+  if (valor === undefined || !Number.isFinite(valor)) return null;
+  return valor >= rango.min && valor <= rango.max ? valor : null;
 }
 
 export const historyRepo = {
@@ -177,6 +217,7 @@ export const historyRepo = {
   /** Guarda una atencion y devuelve el item con el id que asigno la base. */
   async add(item: HistoryItem): Promise<HistoryItem> {
     const p = item.paciente;
+    const llegada = p.queuedAt ?? item.atendidoEn;
 
     const { data, error } = await supabase
       .from('appointment_history')
@@ -185,12 +226,36 @@ export const historyRepo = {
           user_id: APP_USER_ID,
           patient_id: p.id,
           patient_name: p.nombre,
-          patient_birthday: p.fechaNacimiento || null,
-          symptoms: p.sintomas,
+          // Copia del numero de identidad: sobrevive aunque patient_id se
+          // ponga en NULL al borrar al paciente de la cola.
+          numero_identidad: p.numeroIdentidad || null,
+          // patient_birthday y symptoms son NOT NULL en la tabla: se manda
+          // cadena vacia antes que null para no perder toda la atencion.
+          patient_birthday: p.fechaNacimiento || '',
+          symptoms: p.sintomas || '',
           urgency: p.urgencia,
           expediente: p.expediente,
           attended_at: item.atendidoEn,
           waited_ms: item.waitedMs ?? null,
+
+          // --- Dataset de Ciencia de Datos ---
+          // Se copian los signos clinicos del paciente para que el historial
+          // sirva como conjunto de entrenamiento y como fuente para Power BI.
+          edad: edadDesdeFecha(p.fechaNacimiento),
+          sintoma_principal: p.sintomaPrincipal ?? null,
+          nivel_dolor: p.nivelDolor ?? null,
+          dificultad_respiratoria: p.dificultadRespiratoria ?? null,
+          temperatura: dentroDeRango(p.temperatura, RANGO_TEMPERATURA),
+          frecuencia_cardiaca: dentroDeRango(p.frecuenciaCardiaca, RANGO_FRECUENCIA),
+
+          // Mismas marcas de tiempo en dos formatos: bigint para la app,
+          // timestamptz para consultar desde SQL y Power BI sin convertir.
+          queued_at: llegada,
+          fecha_llegada: new Date(llegada).toISOString(),
+          fecha_atencion: new Date(item.atendidoEn).toISOString(),
+
+          prediccion_urgencia: p.prediccionUrgencia ?? null,
+          prediccion_confianza: p.prediccionConfianza ?? null,
         },
       ])
       .select()

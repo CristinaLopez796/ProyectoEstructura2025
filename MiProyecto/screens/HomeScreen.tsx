@@ -15,7 +15,6 @@ import { Patient } from "../models/Patient";
 import PriorityQueue from "./lib/priorityQueue";
 import LinkedList from "./lib/linkedList";
 import HistoryScreen, { HistoryItem } from "./HistoryScreen";
-import Stack from "./lib/stack";
 import StatsScreen from "./StatsScreen";
 import SettingsScreen from "./SettingsScreen";
 import { useResponsive } from "../theme/responsive";
@@ -68,14 +67,12 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [undoStack, setUndoStack] = useState<HistoryItem[]>([]);
 
   // Estructuras de datos: siguen siendo el motor de la app. Supabase solo
   // sustituye a AsyncStorage como lugar donde persisten los datos; el orden
   // de atención lo sigue decidiendo el heap, no la base.
   const pqRef = useRef(new PriorityQueue());
   const historyRef = useRef(new LinkedList<HistoryItem>());
-  const stackRef = useRef(new Stack<HistoryItem>());
 
   // -------- Carga inicial desde Supabase --------
   const cargarTodo = useCallback(async () => {
@@ -96,10 +93,6 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
       setHistory(hist);
       historyRef.current.rebuildFrom(hist);
 
-      // La pila de deshacer es de la sesión actual: solo tiene sentido
-      // deshacer lo que se atendió en este rato, no algo de la semana pasada.
-      stackRef.current.rebuildFrom([]);
-      setUndoStack([]);
 
       setIsDark(dark);
     } catch (e: any) {
@@ -164,8 +157,6 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
       historyRef.current.append(guardado);
       setHistory(historyRef.current.toArray());
 
-      stackRef.current.push(guardado);
-      setUndoStack(stackRef.current.toArray());
 
       showAlert(
         "Atendido",
@@ -176,38 +167,6 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
       pqRef.current.insert(paciente, paciente.urgencia, queuedAt);
       setPatients((prev) => [...prev]);
       showAlert("Error al atender", e?.message ?? "No se pudo completar la atención.");
-    }
-  };
-
-  // -------- Deshacer --------
-  const undoLast = async () => {
-    const last = stackRef.current.pop();
-    if (!last) {
-      showAlert("Información", "No hay acciones para deshacer.");
-      return;
-    }
-
-    try {
-      const paciente = last.paciente;
-
-      // Vuelve a la cola y se borra del historial.
-      const devuelto = await patientsRepo.add({ ...paciente, queuedAt: Date.now() });
-      if (last.id) await historyRepo.remove(last.id);
-
-      const newHistory = history.filter((h) => h.id !== last.id);
-      historyRef.current.rebuildFrom(newHistory);
-      setHistory(newHistory);
-
-      setPatients((prev) => [...prev, devuelto]);
-      pqRef.current.insert(devuelto, devuelto.urgencia, Date.now());
-
-      setUndoStack(stackRef.current.toArray());
-
-      showAlert("Deshecho", `Se regresó a ${paciente.nombre} a la lista de espera.`);
-    } catch (e: any) {
-      stackRef.current.push(last); // la acción sigue pendiente de deshacer
-      setUndoStack(stackRef.current.toArray());
-      showAlert("Error al deshacer", e?.message ?? "No se pudo deshacer la acción.");
     }
   };
 
@@ -289,15 +248,15 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
                 name="Historial"
                 options={{
                   title: "Historial",
-                  tabBarBadge: history.length > 0 ? history.length : undefined,
+                  // Sin contador: el historial solo crece, asi que el numero no
+                  // avisa de nada y con cientos de atenciones no cabe en la
+                  // burbuja (se veia cortado como "1...").
                 }}
               >
                 {() => (
                   <View style={{ flex: 1 }}>
                     <HistoryScreen
                       items={history}
-                      onUndo={undoLast}
-                      canUndo={undoStack.length > 0}
                     />
                   </View>
                 )}

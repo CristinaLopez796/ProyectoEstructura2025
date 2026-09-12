@@ -13,6 +13,12 @@ interface Props {
   onSelect?: (p: Patient) => void;
 }
 
+
+/** Quita tildes para que "martinez" encuentre "Martínez". */
+function sinTildes(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
 function prioridadLabel(p: 1 | 2 | 3) {
   if (p === 1) return "Alta";
   if (p === 2) return "Media";
@@ -43,9 +49,16 @@ export default function PatientList({ patients, onServeNext, onSelect }: Props) 
   }, [patients]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = sinTildes(query.trim());
     if (!q) return sorted;
-    return sorted.filter((p) => p.nombre.toLowerCase().includes(q));
+    // Igual que en el historial: si son digitos, busca por identidad.
+    const soloDigitos = q.replace(/D/g, "");
+    const porIdentidad = soloDigitos.length > 0 && /^[ds-]+$/.test(q);
+    return sorted.filter((p) =>
+      porIdentidad
+        ? (p.numeroIdentidad ?? "").replace(/D/g, "").includes(soloDigitos)
+        : sinTildes(p.nombre).includes(q) || sinTildes(p.expediente ?? "").includes(q)
+    );
   }, [sorted, query]);
 
   return (
@@ -96,7 +109,7 @@ export default function PatientList({ patients, onServeNext, onSelect }: Props) 
             <View style={styles.searchBox}>
               <Ionicons name="search-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
               <TextInput
-                placeholder="Buscar por nombre..."
+                placeholder="Buscar por nombre o identidad..."
                 value={query}
                 onChangeText={setQuery}
                 style={[styles.searchInput, { fontSize: r.font.body }]}
@@ -137,6 +150,9 @@ export default function PatientList({ patients, onServeNext, onSelect }: Props) 
               </View>
             </View>
 
+            {!!item.numeroIdentidad && (
+              <Text style={[styles.meta, { fontSize: r.font.small }]}>Identidad: {item.numeroIdentidad}</Text>
+            )}
             <Text style={[styles.meta, { fontSize: r.font.small }]}>Expediente: {item.expediente}</Text>
             {!!item.fechaNacimiento && (
               <Text style={[styles.meta, { fontSize: r.font.small }]}>

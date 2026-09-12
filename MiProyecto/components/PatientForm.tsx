@@ -9,6 +9,8 @@ import {
   Switch,
 } from "react-native";
 import { showAlert } from "../utils/alert";
+import { edadDesdeFecha } from "../utils/datetime";
+import { RANGO_TEMPERATURA, RANGO_FRECUENCIA } from "../utils/patientRepository";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { Patient } from "../models/Patient";
 import { v4 as uuidv4 } from "uuid";
@@ -34,14 +36,15 @@ const MAX_SINTOMAS = 240;
 const isNonEmpty = (s: string) => s.trim().length > 0;
 const onlyDigits = (s: string) => s.replace(/[^\d]/g, "");
 
-function edadDesdeFecha(ddmmyyyy: string): number | null {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(ddmmyyyy.trim());
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m;
-  const nacimiento = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-  if (Number.isNaN(nacimiento.getTime())) return null;
-  const edadMs = Date.now() - nacimiento.getTime();
-  return Math.floor(edadMs / (1000 * 60 * 60 * 24 * 365.25));
+/** Numero de identidad: 13 digitos con el formato 0000-0000-00000. */
+const IDENTIDAD_DIGITOS = 13;
+
+/** Va formateando mientras se escribe, sin estorbar al borrar. */
+function maskIdentidad(input: string) {
+  const d = onlyDigits(input).slice(0, IDENTIDAD_DIGITOS);
+  if (d.length <= 4) return d;
+  if (d.length <= 8) return `${d.slice(0, 4)}-${d.slice(4)}`;
+  return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`;
 }
 
 function prioridadColor(p: 1 | 2 | 3, colors: Palette) {
@@ -119,6 +122,7 @@ export default function PatientForm({ onAddPatient }: Props) {
     : { flexGrow: 1, flexShrink: 1, flexBasis: "100%" as const };
 
   const [nombre, setNombre] = useState("");
+  const [numeroIdentidad, setNumeroIdentidad] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [sintomas, setSintomas] = useState("");
   const [urgencia, setUrgencia] = useState<1 | 2 | 3>(3);
@@ -149,10 +153,29 @@ export default function PatientForm({ onAddPatient }: Props) {
     return /^\d{2}\/\d{2}\/\d{4}$/.test(fechaNacimiento) ? "" : "Usa DD/MM/AAAA.";
   }, [fechaNacimiento]);
 
+  // Los signos clinicos son obligatorios: son las variables que usa el modelo
+  // de Ciencia de Datos, y si no se capturan aqui quedan NULL para siempre en
+  // appointment_history (no hay forma de recuperarlos despues).
+  const sintomaPrincipalError = sintomaPrincipal ? "" : "Elige el síntoma principal.";
+  const nivelDolorError = nivelDolor ? "" : "Indica el nivel de dolor.";
+  const temperaturaVacia = !temperatura.trim() ? "La temperatura es obligatoria." : "";
+  const frecuenciaVacia = !frecuenciaCardiaca.trim() ? "La frecuencia cardíaca es obligatoria." : "";
+
+  const identidadError = useMemo(() => {
+    const d = onlyDigits(numeroIdentidad);
+    if (d.length === 0) return "El número de identidad es obligatorio.";
+    return d.length === IDENTIDAD_DIGITOS
+      ? ""
+      : `Debe tener ${IDENTIDAD_DIGITOS} dígitos (llevas ${d.length}).`;
+  }, [numeroIdentidad]);
+
   // Version "visible" de cada error: se activa tras el primer intento de envio.
+  const verIdentidadError = intentoEnviar && !!identidadError;
   const verNombreError = intentoEnviar && !!nombreError;
   const verSintomasError = intentoEnviar && !!sintomasError;
   const verFechaError = intentoEnviar && !!fechaError;
+  const verSintomaPrincipalError = intentoEnviar && !!sintomaPrincipalError;
+  const verNivelDolorError = intentoEnviar && !!nivelDolorError;
 
   const sintomasCount = `${sintomas.length}/${MAX_SINTOMAS}`;
 
@@ -165,6 +188,24 @@ export default function PatientForm({ onAddPatient }: Props) {
   const temperaturaNum = parseFloat(temperatura.replace(",", "."));
   const frecuenciaCardiacaNum = parseInt(onlyDigits(frecuenciaCardiaca), 10);
   const edadEstimada = edadDesdeFecha(fechaNacimiento) ?? 30;
+
+  // Estos rangos son los mismos que exigen los CHECK de appointment_history.
+  // Se validan aqui, al registrar, porque si no el error aparecia mucho despues
+  // —al pulsar "Atender"— y con un mensaje de PostgreSQL incomprensible.
+  const temperaturaError = useMemo(() => {
+    if (!temperatura.trim() || Number.isNaN(temperaturaNum)) return "";
+    return temperaturaNum >= RANGO_TEMPERATURA.min && temperaturaNum <= RANGO_TEMPERATURA.max
+      ? ""
+      : `La temperatura debe estar entre ${RANGO_TEMPERATURA.min} y ${RANGO_TEMPERATURA.max} °C.`;
+  }, [temperatura, temperaturaNum]);
+
+  const frecuenciaError = useMemo(() => {
+    if (!frecuenciaCardiaca.trim() || Number.isNaN(frecuenciaCardiacaNum)) return "";
+    return frecuenciaCardiacaNum >= RANGO_FRECUENCIA.min &&
+      frecuenciaCardiacaNum <= RANGO_FRECUENCIA.max
+      ? ""
+      : `La frecuencia debe estar entre ${RANGO_FRECUENCIA.min} y ${RANGO_FRECUENCIA.max} lpm.`;
+  }, [frecuenciaCardiaca, frecuenciaCardiacaNum]);
 
   const datosSuficientes =
     !!sintomaPrincipal &&
@@ -203,6 +244,10 @@ export default function PatientForm({ onAddPatient }: Props) {
     setIntentoEnviar(true);
 
     // validaciones
+    if (identidadError) {
+      showAlert("Validación", identidadError);
+      return;
+    }
     if (!isNonEmpty(nombre) || !isNonEmpty(sintomas)) {
       showAlert("Validación", "El nombre y los síntomas son obligatorios.");
       return;
@@ -219,6 +264,20 @@ export default function PatientForm({ onAddPatient }: Props) {
       showAlert("Validación", "Usa formato de fecha DD/MM/AAAA.");
       return;
     }
+    // Signos clinicos: obligatorios para que el historial sirva como dataset.
+    const faltaClinico =
+      sintomaPrincipalError || nivelDolorError || temperaturaVacia || frecuenciaVacia;
+    if (faltaClinico) {
+      showAlert(
+        "Faltan signos clínicos",
+        `${faltaClinico}\n\nEstos datos se guardan en el historial para el análisis de Ciencia de Datos.`
+      );
+      return;
+    }
+    if (temperaturaError || frecuenciaError) {
+      showAlert("Validación", temperaturaError || frecuenciaError);
+      return;
+    }
 
     // construir paciente
     const id = uuidv4();
@@ -227,6 +286,7 @@ export default function PatientForm({ onAddPatient }: Props) {
     const nuevoPaciente: Patient = {
       id,
       nombre: nombre.trim(),
+      numeroIdentidad: numeroIdentidad.trim(),
       fechaNacimiento: fechaNacimiento.trim(), // guardas como DD/MM/AAAA (tu preferencia)
       sintomas: sintomas.trim(),
       urgencia,
@@ -252,6 +312,7 @@ export default function PatientForm({ onAddPatient }: Props) {
 
     // limpiar
     setNombre("");
+    setNumeroIdentidad("");
     setFechaNacimiento("");
     setSintomas("");
     setUrgencia(3);
@@ -316,6 +377,30 @@ export default function PatientForm({ onAddPatient }: Props) {
             />
           </View>
 
+          {/* Número de identidad */}
+          <View style={[styles.field, halfField]}>
+            <Text style={styles.label}>Número de identidad *</Text>
+            <TextInput
+              placeholder="0000-0000-00000"
+              placeholderTextColor={colors.textMuted}
+              value={numeroIdentidad}
+              onChangeText={(t) => setNumeroIdentidad(maskIdentidad(t))}
+              keyboardType="number-pad"
+              style={[styles.input, verIdentidadError && styles.inputError]}
+              returnKeyType="next"
+              accessibilityLabel="Número de identidad del paciente"
+            />
+            <FieldHint
+              error={verIdentidadError ? identidadError : ""}
+              ok={!identidadError && !!numeroIdentidad}
+              hint="13 dígitos. Sirve para buscar al paciente en el historial."
+              styles={styles}
+              colors={colors}
+            />
+          </View>
+        </View>
+
+        <View style={styles.rowFields}>
           {/* Fecha de nacimiento */}
           <View style={[styles.field, halfField]}>
             <Text style={styles.label}>Fecha de nacimiento *</Text>
@@ -362,19 +447,20 @@ export default function PatientForm({ onAddPatient }: Props) {
       <View style={styles.card}>
         <SectionHeader
           icon="sparkles-outline"
-          title="Signos para la prioridad sugerida"
-          badge="Opcional"
+          title="Signos clínicos"
+          badge="Obligatorio"
           styles={styles}
           colors={colors}
         />
         <Text style={styles.sectionHint}>
-          SmartTriage usa estos datos para sugerir una prioridad con el modelo de Ciencia de
-          Datos. Es solo una recomendación: tú decides la urgencia final.
+          Estos datos alimentan el modelo de Ciencia de Datos y quedan guardados en el
+          historial. Son obligatorios: sin ellos el registro del paciente queda incompleto
+          para el análisis.
         </Text>
 
         {/* Síntoma principal */}
         <View style={styles.field}>
-          <Text style={styles.label}>Síntoma principal</Text>
+          <Text style={styles.label}>Síntoma principal*</Text>
           <View style={styles.wrapChipsRow}>
             {SINTOMAS_PRINCIPALES.map((s) => {
               const active = sintomaPrincipal === s.value;
@@ -393,11 +479,18 @@ export default function PatientForm({ onAddPatient }: Props) {
               );
             })}
           </View>
+          <FieldHint
+            error={verSintomaPrincipalError ? sintomaPrincipalError : ""}
+            hint="Elige el motivo principal de la consulta."
+            ok={!!sintomaPrincipal}
+            styles={styles}
+            colors={colors}
+          />
         </View>
 
         {/* Nivel de dolor */}
         <View style={styles.field}>
-          <Text style={styles.label}>Nivel de dolor</Text>
+          <Text style={styles.label}>Nivel de dolor*</Text>
           <View style={styles.chipsRow}>
             {[1, 2, 3].map((n) => {
               const active = nivelDolor === n;
@@ -415,6 +508,13 @@ export default function PatientForm({ onAddPatient }: Props) {
               );
             })}
           </View>
+          <FieldHint
+            error={verNivelDolorError ? nivelDolorError : ""}
+            hint="Bajo, Medio o Alto."
+            ok={!!nivelDolor}
+            styles={styles}
+            colors={colors}
+          />
         </View>
 
         {/* Dificultad respiratoria */}
@@ -430,25 +530,45 @@ export default function PatientForm({ onAddPatient }: Props) {
         {/* Temperatura y frecuencia cardiaca */}
         <View style={styles.rowFields}>
           <View style={[styles.field, styles.halfMin]}>
-            <Text style={styles.label}>Temperatura (°C)</Text>
+            <Text style={styles.label}>Temperatura (°C)*</Text>
             <TextInput
               placeholder="Ej. 37.5"
               placeholderTextColor={colors.textMuted}
               value={temperatura}
               onChangeText={setTemperatura}
               keyboardType="decimal-pad"
-              style={styles.input}
+              style={[
+                styles.input,
+                temperaturaError || (intentoEnviar && temperaturaVacia) ? styles.inputError : null,
+              ]}
+            />
+            <FieldHint
+              error={temperaturaError || (intentoEnviar ? temperaturaVacia : "")}
+              hint={`Entre ${RANGO_TEMPERATURA.min} y ${RANGO_TEMPERATURA.max} °C.`}
+              ok={!!temperatura.trim() && !temperaturaError}
+              styles={styles}
+              colors={colors}
             />
           </View>
           <View style={[styles.field, styles.halfMin]}>
-            <Text style={styles.label}>Frec. cardíaca (lpm)</Text>
+            <Text style={styles.label}>Frec. cardíaca (lpm)*</Text>
             <TextInput
               placeholder="Ej. 90"
               placeholderTextColor={colors.textMuted}
               value={frecuenciaCardiaca}
               onChangeText={setFrecuenciaCardiaca}
               keyboardType="number-pad"
-              style={styles.input}
+              style={[
+                styles.input,
+                frecuenciaError || (intentoEnviar && frecuenciaVacia) ? styles.inputError : null,
+              ]}
+            />
+            <FieldHint
+              error={frecuenciaError || (intentoEnviar ? frecuenciaVacia : "")}
+              hint={`Entre ${RANGO_FRECUENCIA.min} y ${RANGO_FRECUENCIA.max} lpm.`}
+              ok={!!frecuenciaCardiaca.trim() && !frecuenciaError}
+              styles={styles}
+              colors={colors}
             />
           </View>
         </View>
