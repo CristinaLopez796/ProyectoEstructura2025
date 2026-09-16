@@ -1,4 +1,5 @@
 import { SintomaPrincipal } from "../utils/priorityPrediction";
+import { Ciudad } from "../utils/ciudades";
 
 export interface Patient {
   /** UUID interno de la fila. No es el numero de identidad de la persona. */
@@ -14,6 +15,13 @@ export interface Patient {
   numeroIdentidad?: string;
 
   fechaNacimiento: string;
+
+  /**
+   * Ciudad de procedencia. Opcional en el tipo por los registros creados antes
+   * de que existiera la columna; el formulario si la exige.
+   */
+  ciudad?: Ciudad;
+
   sintomas: string;
   urgencia: 1 | 2 | 3; // 1: alta, 2: media, 3: baja
 

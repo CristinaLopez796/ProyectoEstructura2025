@@ -153,6 +153,9 @@ export default function PatientList({ patients, onServeNext, onSelect }: Props) 
             {!!item.numeroIdentidad && (
               <Text style={[styles.meta, { fontSize: r.font.small }]}>Identidad: {item.numeroIdentidad}</Text>
             )}
+            {!!item.ciudad && (
+              <Text style={[styles.meta, { fontSize: r.font.small }]}>Ciudad: {item.ciudad}</Text>
+            )}
             <Text style={[styles.meta, { fontSize: r.font.small }]}>Expediente: {item.expediente}</Text>
             {!!item.fechaNacimiento && (
               <Text style={[styles.meta, { fontSize: r.font.small }]}>

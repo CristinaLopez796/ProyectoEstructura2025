@@ -7,6 +7,7 @@ import { Palette } from "../theme/colors";
 import { useResponsive } from "../theme/responsive";
 import { useTheme } from "../theme/ThemeContext";
 import { SesionStaff } from "../utils/auth";
+import { descripcionPermisos, permisosDe } from "../utils/permissions";
 
 export default function SettingsScreen({
   isDark,
@@ -22,6 +23,7 @@ export default function SettingsScreen({
   const r = useResponsive();
   const { colors } = useTheme();
   const styles = useMemo(() => crearEstilos(colors), [colors]);
+  const permisos = useMemo(() => permisosDe(sesion), [sesion]);
 
   return (
     <ResponsiveScreen scroll maxWidth={r.pick({ xs: 9999, md: 640 })}>
@@ -85,6 +87,26 @@ export default function SettingsScreen({
                   sesion.usuario}
               </Text>
             </View>
+          )}
+          {!!sesion && (
+            <>
+              <View style={[styles.row, { marginTop: 10 }]}>
+                <View style={styles.rowLabel}>
+                  <Ionicons name="key-outline" size={18} color={colors.tabActive} />
+                  <Text style={[styles.label, { fontSize: r.font.subtitle }]}>Permisos</Text>
+                </View>
+                <Text style={[styles.value, { fontSize: r.font.small }]}>
+                  {descripcionPermisos(permisos)}
+                </Text>
+              </View>
+              <Text style={[styles.hint, { fontSize: r.font.small }]}>
+                {permisos.registrar
+                  ? "Tu rol da de alta pacientes en la cola. La atención la registran médico y enfermería."
+                  : permisos.atender
+                  ? "Tu rol atiende a los pacientes de la cola. El registro lo hacen administración y recepción."
+                  : "Tu rol no tiene permiso para registrar ni atender pacientes; solo puedes consultar la lista, el historial y las estadísticas."}
+              </Text>
+            </>
           )}
           <Pressable
             onPress={onLogout}

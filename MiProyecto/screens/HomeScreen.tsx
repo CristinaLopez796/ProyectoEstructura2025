@@ -23,6 +23,7 @@ import { DARK, LIGHT } from "../theme/colors";
 import { ThemeProvider } from "../theme/ThemeContext";
 import { patientsRepo, historyRepo, settingsRepo } from "../utils/patientRepository";
 import { SesionStaff } from "../utils/auth";
+import { permisosDe } from "../utils/permissions";
 
 type RootTabParamList = {
   Registrar: undefined;
@@ -44,6 +45,13 @@ export default function HomeScreen({
   // En pantallas anchas la barra de pestañas pasa de abajo a un riel lateral.
   const r = useResponsive();
   const sideTabs = r.isDesktop;
+
+  // -------- Permisos por rol --------
+  // Recepcion/admin registran; medico/enfermeria atienden. Ver
+  // utils/permissions.ts. Aqui solo decide que se muestra: las funciones
+  // handleAddPatient y serveNext lo vuelven a comprobar, para que ocultar un
+  // boton no sea lo unico que impide la accion.
+  const permisos = useMemo(() => permisosDe(sesion), [sesion]);
 
   // -------- Estado de carga --------
   // Con Supabase los datos ya no están disponibles al instante como con
@@ -126,6 +134,10 @@ export default function HomeScreen({
 
   // -------- Agregar paciente --------
   const handleAddPatient = async (p: Patient) => {
+    if (!permisos.registrar) {
+      showAlert("Sin permiso", "Tu rol no puede registrar pacientes.");
+      throw new Error("Sin permiso para registrar");
+    }
     try {
       const guardado = await patientsRepo.add(p);
       setPatients((prev) => [...prev, guardado]);
@@ -142,6 +154,11 @@ export default function HomeScreen({
 
   // -------- Atender siguiente (heap -> historial + pila) --------
   const serveNext = async () => {
+    if (!permisos.atender) {
+      showAlert("Sin permiso", "Tu rol no puede atender pacientes.");
+      return;
+    }
+
     const next = pqRef.current.pop();
     if (!next) {
       showAlert("Información", "No hay pacientes en la lista de espera.");
@@ -238,13 +255,17 @@ export default function HomeScreen({
                 ),
               })}
             >
-              <Tab.Screen name="Registrar" options={{ title: "Registrar Paciente" }}>
-                {() => (
-                  <View style={{ flex: 1 }}>
-                    <PatientForm onAddPatient={handleAddPatient} />
-                  </View>
-                )}
-              </Tab.Screen>
+              {/* Solo admin y recepcion registran: para medico y enfermeria la
+                  pestaña no existe, no aparece deshabilitada. */}
+              {permisos.registrar && (
+                <Tab.Screen name="Registrar" options={{ title: "Registrar Paciente" }}>
+                  {() => (
+                    <View style={{ flex: 1 }}>
+                      <PatientForm onAddPatient={handleAddPatient} />
+                    </View>
+                  )}
+                </Tab.Screen>
+              )}
 
               <Tab.Screen
                 name="Lista"
@@ -256,7 +277,12 @@ export default function HomeScreen({
               >
                 {() => (
                   <View style={{ flex: 1 }}>
-                    <PatientList patients={orderedPatients} onServeNext={serveNext} />
+                    {/* Sin onServeNext, PatientList no pinta el boton "Atender":
+                        admin y recepcion ven la cola, pero solo de consulta. */}
+                    <PatientList
+                      patients={orderedPatients}
+                      onServeNext={permisos.atender ? serveNext : undefined}
+                    />
                   </View>
                 )}
               </Tab.Screen>

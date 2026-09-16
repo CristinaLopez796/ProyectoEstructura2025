@@ -25,6 +25,7 @@ import {
   SINTOMAS_PRINCIPALES,
   SintomaPrincipal,
 } from "../utils/priorityPrediction";
+import { Ciudad, OPCIONES_CIUDAD } from "../utils/ciudades";
 
 interface Props {
   onAddPatient: (patient: Patient) => void | Promise<void>;
@@ -124,6 +125,7 @@ export default function PatientForm({ onAddPatient }: Props) {
   const [nombre, setNombre] = useState("");
   const [numeroIdentidad, setNumeroIdentidad] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
+  const [ciudad, setCiudad] = useState<Ciudad | null>(null);
   const [sintomas, setSintomas] = useState("");
   const [urgencia, setUrgencia] = useState<1 | 2 | 3>(3);
 
@@ -153,6 +155,11 @@ export default function PatientForm({ onAddPatient }: Props) {
     return /^\d{2}\/\d{2}\/\d{4}$/.test(fechaNacimiento) ? "" : "Usa DD/MM/AAAA.";
   }, [fechaNacimiento]);
 
+  // Obligatoria por la misma razon que los signos clinicos: si no se captura
+  // al registrar, queda NULL para siempre en appointment_history y el informe
+  // de procedencia en Power BI sale incompleto.
+  const ciudadError = ciudad ? "" : "Elige la ciudad de procedencia.";
+
   // Los signos clinicos son obligatorios: son las variables que usa el modelo
   // de Ciencia de Datos, y si no se capturan aqui quedan NULL para siempre en
   // appointment_history (no hay forma de recuperarlos despues).
@@ -174,6 +181,7 @@ export default function PatientForm({ onAddPatient }: Props) {
   const verNombreError = intentoEnviar && !!nombreError;
   const verSintomasError = intentoEnviar && !!sintomasError;
   const verFechaError = intentoEnviar && !!fechaError;
+  const verCiudadError = intentoEnviar && !!ciudadError;
   const verSintomaPrincipalError = intentoEnviar && !!sintomaPrincipalError;
   const verNivelDolorError = intentoEnviar && !!nivelDolorError;
 
@@ -264,6 +272,10 @@ export default function PatientForm({ onAddPatient }: Props) {
       showAlert("Validación", "Usa formato de fecha DD/MM/AAAA.");
       return;
     }
+    if (ciudadError) {
+      showAlert("Validación", ciudadError);
+      return;
+    }
     // Signos clinicos: obligatorios para que el historial sirva como dataset.
     const faltaClinico =
       sintomaPrincipalError || nivelDolorError || temperaturaVacia || frecuenciaVacia;
@@ -288,6 +300,7 @@ export default function PatientForm({ onAddPatient }: Props) {
       nombre: nombre.trim(),
       numeroIdentidad: numeroIdentidad.trim(),
       fechaNacimiento: fechaNacimiento.trim(), // guardas como DD/MM/AAAA (tu preferencia)
+      ciudad: ciudad ?? undefined,
       sintomas: sintomas.trim(),
       urgencia,
       expediente,
@@ -314,6 +327,7 @@ export default function PatientForm({ onAddPatient }: Props) {
     setNombre("");
     setNumeroIdentidad("");
     setFechaNacimiento("");
+    setCiudad(null);
     setSintomas("");
     setUrgencia(3);
     setSintomaPrincipal(null);
@@ -413,6 +427,37 @@ export default function PatientForm({ onAddPatient }: Props) {
                   ? `${fechaNacimiento}${edadEstimadaTexto}`
                   : "Elige día, mes y año."
               }
+              styles={styles}
+              colors={colors}
+            />
+          </View>
+
+          {/* Ciudad de procedencia */}
+          <View style={[styles.field, halfField]}>
+            <Text style={styles.label}>Ciudad de procedencia *</Text>
+            <View style={styles.wrapChipsRow} accessible accessibilityRole="radiogroup">
+              {OPCIONES_CIUDAD.map((c) => {
+                const active = ciudad === c.value;
+                return (
+                  <Pressable
+                    key={c.value}
+                    onPress={() => setCiudad(active ? null : c.value)}
+                    style={[styles.chipSmall, active && styles.chipSmallActive]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={`Ciudad: ${c.label}`}
+                  >
+                    <Text style={[styles.chipSmallText, active && styles.chipSmallTextActive]}>
+                      {c.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <FieldHint
+              error={verCiudadError ? ciudadError : ""}
+              ok={!!ciudad}
+              hint='De dónde viene el paciente. Usa "Otros" si no es de ninguna de las tres.'
               styles={styles}
               colors={colors}
             />

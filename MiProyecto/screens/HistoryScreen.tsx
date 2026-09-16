@@ -250,6 +250,9 @@ export default function HistoryScreen({
         {!!p.numeroIdentidad && (
           <Text style={[styles.meta, { fontSize: r.font.small }]}>Identidad: {p.numeroIdentidad}</Text>
         )}
+        {!!p.ciudad && (
+          <Text style={[styles.meta, { fontSize: r.font.small }]}>Ciudad: {p.ciudad}</Text>
+        )}
         <Text style={[styles.meta, { fontSize: r.font.small }]}>Expediente: {p.expediente}</Text>
         <Text style={[styles.meta, { fontSize: r.font.small }]}>
           Atendido: {formatDateTime(item.atendidoEn)}

@@ -16,6 +16,7 @@ import { Patient } from '../models/Patient';
 import { HistoryItem } from '../screens/HistoryScreen';
 import { SintomaPrincipal } from './priorityPrediction';
 import { edadDesdeFecha } from './datetime';
+import { ciudadValida } from './ciudades';
 
 // ---------------------------------------------------------------
 // Traduccion entre la fila de PostgreSQL y el modelo de la app
@@ -26,6 +27,7 @@ type PatientRow = {
   nombre: string;
   numero_identidad: string | null;
   fecha_nacimiento: string | null;
+  ciudad: string | null;
   sintomas: string;
   expediente: string;
   urgencia: 1 | 2 | 3;
@@ -53,6 +55,7 @@ function rowToPatient(row: PatientRow): Patient {
     nombre: row.nombre,
     numeroIdentidad: row.numero_identidad ?? undefined,
     fechaNacimiento: row.fecha_nacimiento ?? '',
+    ciudad: ciudadValida(row.ciudad),
     sintomas: row.sintomas,
     expediente: row.expediente,
     urgencia: row.urgencia,
@@ -74,6 +77,7 @@ function patientToRow(p: Patient, userId: string) {
     nombre: p.nombre,
     numero_identidad: p.numeroIdentidad || null,
     fecha_nacimiento: p.fechaNacimiento || null,
+    ciudad: p.ciudad ?? null,
     sintomas: p.sintomas,
     expediente: p.expediente,
     urgencia: p.urgencia,
@@ -144,6 +148,7 @@ type HistoryRow = {
   patient_name: string;
   numero_identidad: string | null;
   patient_birthday: string | null;
+  ciudad: string | null;
   symptoms: string | null;
   urgency: 1 | 2 | 3;
   expediente: string | null;
@@ -176,6 +181,7 @@ function rowToHistory(row: HistoryRow): HistoryItem {
       nombre: row.patient_name,
       numeroIdentidad: row.numero_identidad ?? undefined,
       fechaNacimiento: row.patient_birthday ?? '',
+      ciudad: ciudadValida(row.ciudad),
       sintomas: row.symptoms ?? '',
       urgencia: row.urgency,
       expediente: row.expediente ?? '',
@@ -240,6 +246,10 @@ export const historyRepo = {
           // patient_birthday y symptoms son NOT NULL en la tabla: se manda
           // cadena vacia antes que null para no perder toda la atencion.
           patient_birthday: p.fechaNacimiento || '',
+          // Se copia al historial en vez de leerse por join: cuando se atiende
+          // al paciente su fila en `patients` se borra, asi que la ciudad
+          // tiene que quedar guardada aqui o se pierde para el analisis.
+          ciudad: p.ciudad ?? null,
           symptoms: p.sintomas || '',
           urgency: p.urgencia,
           expediente: p.expediente,
