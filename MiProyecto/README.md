@@ -20,7 +20,6 @@ MiProyecto/
 │   ├── priorityPrediction.ts   Regla ligera de urgencia que corre en el cliente
 │   └── patientRepository.ts    Capa de datos contra Supabase
 ├── config/supabaseClient.ts
-├── database/               Esquema SQL, datos de prueba y políticas (ver 00_LEEME.md)
 ├── data/generar_dataset.py     Generador del dataset simulado + regla baseline
 ├── notebook/
 │   ├── SmartTriage_CienciaDeDatos.ipynb   Proceso completo de CD (Colab-ready)
@@ -39,8 +38,10 @@ npm install
 npx expo start -c
 ```
 
-Detalles de Supabase en [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md). El esquema de la
-base y las políticas de acceso están en [`database/`](database/00_LEEME.md).
+Detalles de Supabase en [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md). El esquema
+de la base (tablas, columnas, políticas de acceso, login) vive directamente en
+el proyecto de Supabase — los scripts que lo crearon ya se ejecutaron y no se
+versionan en el repo.
 
 ## Cómo correr el componente de Ciencia de Datos
 
@@ -61,6 +62,6 @@ modelos y exporta `modelo_urgencia.pkl`. Guía completa en
 ## Notas
 
 - `.env` es personal y no se versiona; usa `.env.example` como plantilla.
-- La app abre directo en el registro de pacientes (sin login). Por eso las
-  políticas RLS están en acceso público — aceptable para un proyecto de curso,
-  no para datos reales.
+- La app pide usuario + PIN de 5 dígitos al abrir (login propio, no Supabase
+  Auth). Las políticas RLS de las tablas siguen en acceso público — aceptable
+  para un proyecto de curso, no para datos reales.

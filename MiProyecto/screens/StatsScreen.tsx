@@ -53,6 +53,8 @@ export default function StatsScreen({ queue, history }: Props) {
     sinDatoEspera,
     maxCountQueue,
     maxCountHist,
+    porPersona,
+    maxPorPersona,
   } = useMemo(() => {
     // `counts` = cuantos se atendieron por prioridad, cuenta TODOS los
     // registros del historial (se muestra en la tarjeta "Atendidos").
@@ -99,6 +101,21 @@ export default function StatsScreen({ queue, history }: Props) {
     const maxQ = Math.max(queueCountsMax(queue), 1);
     const maxH = Math.max(counts.p1, counts.p2, counts.p3, 1);
 
+    // Pacientes atendidos por cada quien (login por PIN, ver utils/auth.ts).
+    // Se agrupa por `atendido_por` (el usuario, estable) y se muestra
+    // `atendido_por_nombre` si existe; los registros de antes del login no
+    // tienen ninguno de los dos y se agrupan aparte, en vez de perderse.
+    const porPersonaMap = new Map<string, { etiqueta: string; cantidad: number }>();
+    for (const h of history) {
+      const clave = h.atendidoPor || h.atendidoPorNombre || "__sin_registrar__";
+      const etiqueta = h.atendidoPorNombre || h.atendidoPor || "Sin registrar";
+      const actual = porPersonaMap.get(clave);
+      if (actual) actual.cantidad++;
+      else porPersonaMap.set(clave, { etiqueta, cantidad: 1 });
+    }
+    const porPersonaLista = [...porPersonaMap.values()].sort((a, b) => b.cantidad - a.cantidad);
+    const maxPP = Math.max(1, ...porPersonaLista.map((x) => x.cantidad));
+
     return {
       histCounts: counts,
       avgWaitAll: avgAll,
@@ -107,6 +124,8 @@ export default function StatsScreen({ queue, history }: Props) {
       sinDatoEspera: sinDato,
       maxCountQueue: maxQ,
       maxCountHist: maxH,
+      porPersona: porPersonaLista,
+      maxPorPersona: maxPP,
     };
   }, [history, queue]);
 
@@ -191,6 +210,35 @@ export default function StatsScreen({ queue, history }: Props) {
           <Text style={styles.countText}>{histCounts.p3}</Text>
         </View>
         <Bar value={histCounts.p3} max={maxCountHist} color={colors.priority.p3} />
+      </View>
+
+      {/* Atendidos por cada quien */}
+      <View style={cardStyle}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="people-circle-outline" size={18} color={colors.tabActive} />
+          <Text style={styles.title}>Atendidos por</Text>
+        </View>
+
+        {porPersona.length === 0 ? (
+          <Text style={styles.note}>Todavía no hay atenciones registradas.</Text>
+        ) : (
+          porPersona.map((p, i) => (
+            <View key={p.etiqueta + i} style={i > 0 ? { marginTop: 10 } : undefined}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.metricLabel} numberOfLines={1}>
+                  {p.etiqueta}
+                </Text>
+                <Text style={styles.countText}>{p.cantidad}</Text>
+              </View>
+              <Bar value={p.cantidad} max={maxPorPersona} color={colors.tabActive} />
+            </View>
+          ))
+        )}
+
+        <Text style={styles.note}>
+          Se cuenta desde que existe el login (usuario + PIN). Las atenciones
+          anteriores aparecen como "Sin registrar".
+        </Text>
       </View>
 
       {/* Tiempos promedio */}

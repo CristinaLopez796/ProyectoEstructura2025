@@ -14,6 +14,10 @@ export type HistoryItem = {
   paciente: Patient;
   atendidoEn: number;
   waitedMs?: number;
+  /** Usuario (login) de quien atendio. Vacio en registros de antes del login. */
+  atendidoPor?: string;
+  /** Nombre a mostrar, copiado al momento de la atencion. */
+  atendidoPorNombre?: string;
 };
 
 const MESES = [

@@ -22,6 +22,7 @@ import { showAlert } from "../utils/alert";
 import { DARK, LIGHT } from "../theme/colors";
 import { ThemeProvider } from "../theme/ThemeContext";
 import { patientsRepo, historyRepo, settingsRepo } from "../utils/patientRepository";
+import { SesionStaff } from "../utils/auth";
 
 type RootTabParamList = {
   Registrar: undefined;
@@ -32,7 +33,13 @@ type RootTabParamList = {
 };
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
-export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
+export default function HomeScreen({
+  sesion,
+  onLogout,
+}: {
+  sesion?: SesionStaff | null;
+  onLogout?: () => void;
+}) {
   // -------- Layout responsive --------
   // En pantallas anchas la barra de pestañas pasa de abajo a un riel lateral.
   const r = useResponsive();
@@ -149,7 +156,13 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
     // instantanea" y sesgaria el promedio hacia abajo. Ver StatsScreen.tsx.
     const queuedAt = paciente.queuedAt;
     const waitedMs = typeof queuedAt === "number" ? Math.max(0, now - queuedAt) : undefined;
-    const item: HistoryItem = { paciente, atendidoEn: now, waitedMs };
+    const item: HistoryItem = {
+      paciente,
+      atendidoEn: now,
+      waitedMs,
+      atendidoPor: sesion?.usuario,
+      atendidoPorNombre: sesion?.nombre ?? undefined,
+    };
 
     try {
       // Primero el historial: si esto falla, el paciente sigue en la cola.
@@ -280,6 +293,7 @@ export default function HomeScreen({ onLogout }: { onLogout?: () => void }) {
                     <SettingsScreen
                       isDark={isDark}
                       onToggleDark={cambiarModoOscuro}
+                      sesion={sesion}
                       onLogout={onLogout}
                     />
                   </View>

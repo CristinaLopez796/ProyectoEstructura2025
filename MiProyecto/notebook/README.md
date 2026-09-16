@@ -31,9 +31,8 @@ cd ../notebook && jupyter notebook                   # abre el .ipynb
 ## Cómo se conecta con la app
 
 - El catálogo de síntomas y sus pesos coinciden con
-  [`utils/priorityPrediction.ts`](../utils/priorityPrediction.ts) y con el `CHECK`
-  de la columna `sintoma_principal` en
-  [`database/03_patients.sql`](../database/03_patients.sql).
+  [`utils/priorityPrediction.ts`](../utils/priorityPrediction.ts) y con el
+  `CHECK` de la columna `sintoma_principal` de la tabla `patients` en Supabase.
 - El formulario de registro ([`components/PatientForm.tsx`](../components/PatientForm.tsx))
   captura las seis variables y muestra la urgencia sugerida.
 - La app **no** carga el `.pkl`: usa una destilación ligera del modelo (una regla
@@ -42,9 +41,8 @@ cd ../notebook && jupyter notebook                   # abre el .ipynb
 - La urgencia sugerida (`prediccionUrgencia`) y la confianza (`prediccionConfianza`)
   se guardan junto al paciente en Supabase. Al atender a un paciente, además se
   guarda `edad` (calculada en `utils/datetime.ts` -> `edadDesdeFecha`) en
-  `appointment_history`, para tener la variable ya lista sin reparsear la fecha
-  de nacimiento en cada consulta (ver `database/11_columnas_ml_historial.sql` y
-  `database/12_edad_validacion.sql`).
+  `appointment_history`, para tener la variable ya lista sin reparsear la
+  fecha de nacimiento en cada consulta.
 
 ## Reproducibilidad
 

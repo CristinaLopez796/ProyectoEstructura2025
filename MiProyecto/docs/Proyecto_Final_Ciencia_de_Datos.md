@@ -141,8 +141,7 @@ desbalance moderado, con la clase Alta como minoritaria). Se maneja con
 
 Además del dataset simulado, la tabla `appointment_history` de producción ya
 guarda, por cada atención real, `edad`, `sintoma_principal`, `nivel_dolor`,
-`dificultad_respiratoria`, `temperatura` y `frecuencia_cardiaca` (columnas
-agregadas en `database/11_columnas_ml_historial.sql`). Es un dataset pequeño
+`dificultad_respiratoria`, `temperatura` y `frecuencia_cardiaca`. Es un dataset pequeño
 todavía, pero real: sirve para validar que las relaciones encontradas en el
 dataset simulado sean razonables, y a futuro para reentrenar con datos propios.
 
@@ -177,10 +176,9 @@ producción, `edad` no se captura a mano: se calcula una sola vez, en el momento
 de la atención, a partir de `patient_birthday` (`utils/datetime.ts` ->
 `edadDesdeFecha`). Aun así, es exactamente el tipo de campo derivado que debe
 auditarse, porque puede quedar **desactualizado o ausente** en registros
-antiguos. `database/12_edad_validacion.sql` recalcula la edad desde
-`patient_birthday` (usando la fecha de la atención, no la de hoy, para no sesgar
-los registros históricos), la compara contra el valor guardado y rellena los
-huecos que sí se puedan resolver.
+antiguos. Se recalculó la edad desde `patient_birthday` (usando la fecha de la
+atención, no la de hoy, para no sesgar los registros históricos), se comparó
+contra el valor guardado y se rellenaron los huecos que se pudieron resolver.
 
 Sobre los datos reales del proyecto (148 atenciones): 129 (87 %) ya traían
 `edad` calculada, y las 19 restantes (13 %) la tenían en `NULL` por ser
@@ -321,9 +319,11 @@ los seis campos** del formulario de registro.
 3. **Destilación en producción.** La app usa una regla ligera derivada del modelo,
    no el `.pkl` directamente, para funcionar sin backend de Python; puede haber
    una pequeña diferencia entre ambos.
-4. **Seguridad de datos.** Al eliminar el login, las políticas RLS de Supabase
-   quedaron en acceso público (`database/08_sin_login.sql`); la *anon key* viaja
-   en el bundle. Es aceptable para un proyecto de curso, **no para datos reales**.
+4. **Seguridad de datos.** Las políticas RLS de las tablas de Supabase están en
+   acceso público (no dependen de sesión); la app sí pide usuario + PIN de 5
+   dígitos para entrar, pero eso protege la pantalla, no la base — la *anon
+   key* viaja en el bundle. Es aceptable para un proyecto de curso, **no para
+   datos reales**.
 5. **Sin calibración de probabilidad.** La confianza mostrada es la
    `predict_proba` cruda, no una probabilidad calibrada.
 6. **Datos reales incompletos.** El 13 % de las atenciones registradas en
@@ -338,8 +338,8 @@ los seis campos** del formulario de registro.
 ## 12. Futuras mejoras
 
 - Sustituir el dataset simulado por **registros reales anonimizados** y
-  reentrenar; ya existe la tubería (`database/11_columnas_ml_historial.sql`,
-  `12_edad_validacion.sql`) para extraerlos limpios desde Supabase.
+  reentrenar; `appointment_history` ya guarda las columnas clínicas
+  necesarias, listas para extraerse desde Supabase.
 - **Servir `modelo_urgencia.pkl` desde un endpoint** (FastAPI) y que la app lo
   consulte, con la regla local como respaldo sin conexión.
 - Guardar en Supabase la urgencia sugerida y la decisión final para medir en

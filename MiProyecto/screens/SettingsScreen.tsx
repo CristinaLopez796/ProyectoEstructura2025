@@ -6,14 +6,17 @@ import ResponsiveScreen from "../components/ResponsiveScreen";
 import { Palette } from "../theme/colors";
 import { useResponsive } from "../theme/responsive";
 import { useTheme } from "../theme/ThemeContext";
+import { SesionStaff } from "../utils/auth";
 
 export default function SettingsScreen({
   isDark,
   onToggleDark,
+  sesion,
   onLogout,
 }: {
   isDark: boolean;
   onToggleDark: (value: boolean) => void;
+  sesion?: SesionStaff | null;
   onLogout?: () => void;
 }) {
   const r = useResponsive();
@@ -69,7 +72,25 @@ export default function SettingsScreen({
           <Text style={[styles.sectionTitle, styles.sectionSpacing, { fontSize: r.font.title }]}>
             Cuenta
           </Text>
-          <Pressable onPress={onLogout} style={styles.logoutBtn} accessibilityRole="button">
+          {!!sesion && (
+            <View style={styles.row}>
+              <View style={styles.rowLabel}>
+                <Ionicons name="person-circle-outline" size={18} color={colors.tabActive} />
+                <Text style={[styles.label, { fontSize: r.font.subtitle }]}>
+                  {sesion.nombre || sesion.usuario}
+                </Text>
+              </View>
+              <Text style={[styles.value, { fontSize: r.font.small }]}>
+                {[sesion.rol, sesion.nombre ? sesion.usuario : null].filter(Boolean).join(" · ") ||
+                  sesion.usuario}
+              </Text>
+            </View>
+          )}
+          <Pressable
+            onPress={onLogout}
+            style={[styles.logoutBtn, !!sesion && { marginTop: 10 }]}
+            accessibilityRole="button"
+          >
             <Ionicons name="log-out-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
             <Text style={styles.logoutText}>Cerrar sesión</Text>
           </Pressable>

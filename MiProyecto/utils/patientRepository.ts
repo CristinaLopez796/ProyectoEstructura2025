@@ -1,9 +1,11 @@
 // utils/patientRepository.ts
 // Capa de datos contra Supabase. Reemplaza al AsyncStorage que se usaba antes.
 //
-// La app no tiene login: se conecta como anonimo. Para que esto funcione, las
-// politicas RLS de las tablas deben permitir acceso publico; el script
-// database/08_sin_login.sql se encarga de eso.
+// La app pide login (usuario + PIN, ver utils/auth.ts) pero eso es una
+// pantalla, no una sesion de Supabase Auth: la conexion a la base sigue
+// siendo anonima. Para que esto funcione, las politicas RLS de las tablas
+// permiten acceso publico (configurado directamente en el proyecto de
+// Supabase).
 //
 // Aqui la traduccion entre el modelo Patient (camelCase) y las columnas de
 // PostgreSQL (snake_case) es explicita: un insert con las claves en camelCase
@@ -158,6 +160,10 @@ type HistoryRow = {
   queued_at: number | string | null;
   prediccion_urgencia: 1 | 2 | 3 | null;
   prediccion_confianza: number | string | null;
+
+  // Quien atendio (login por PIN, ver utils/auth.ts).
+  atendido_por: string | null;
+  atendido_por_nombre: string | null;
 };
 
 function rowToHistory(row: HistoryRow): HistoryItem {
@@ -184,6 +190,8 @@ function rowToHistory(row: HistoryRow): HistoryItem {
     },
     atendidoEn: num(row.attended_at) ?? 0,
     waitedMs: num(row.waited_ms),
+    atendidoPor: row.atendido_por ?? undefined,
+    atendidoPorNombre: row.atendido_por_nombre ?? undefined,
   };
 }
 
@@ -256,6 +264,10 @@ export const historyRepo = {
 
           prediccion_urgencia: p.prediccionUrgencia ?? null,
           prediccion_confianza: p.prediccionConfianza ?? null,
+
+          // Quien atendio: lo llena HomeScreen.tsx con la sesion activa.
+          atendido_por: item.atendidoPor ?? null,
+          atendido_por_nombre: item.atendidoPorNombre ?? null,
         },
       ])
       .select()
